@@ -2,10 +2,10 @@
 
 > Comprehensive Claude Code plugin with 12 specialized agents for Rails development
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/your-username/rails-dev-plugin/releases)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/your-username/rails-dev-plugin/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-A powerful Claude Code plugin that provides 12 specialized AI agents to assist with all aspects of Rails application development. From models and controllers to architecture decisions and DevOps, this plugin has you covered.
+A powerful Claude Code plugin that provides 12 specialized AI agents and 2 autonomous Skills to assist with all aspects of Rails application development. From models and controllers to architecture decisions and DevOps, this plugin has you covered.
 
 ## 🚀 Quick Start
 
@@ -34,7 +34,16 @@ Claude: I'll use the rails-model agent to help...
 
 ### 🤖 12 Specialized Agents
 
-This plugin includes expert agents for every aspect of Rails development:
+This plugin includes expert agents for every aspect of Rails development.
+
+### 🎯 2 Autonomous Skills
+
+Skills that Claude invokes automatically based on task context:
+
+- **Ruby Refactoring Expert** - Code smell identification, refactoring patterns, Ruby best practices
+- **Rails Architecture** - Architectural guidance, design patterns, service layer decisions
+
+### Agent Catalog
 
 #### **Backend Development**
 - **rails-model** - ActiveRecord models, migrations, associations, validations, and database schema design
@@ -221,6 +230,11 @@ rails-dev-plugin/
 │   ├── rails-stimulus-turbo.md
 │   ├── rails-test.md
 │   └── rails-views.md
+├── skills/                   # 2 autonomous Skills
+│   ├── ruby-refactoring/
+│   │   └── SKILL.md
+│   └── rails-architecture/
+│       └── SKILL.md
 ├── CHANGELOG.md             # Version history
 ├── CONTRIBUTING.md          # Contribution guidelines
 ├── LICENSE                  # MIT License

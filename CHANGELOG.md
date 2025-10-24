@@ -12,6 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Video tutorials for agent usage
 - Integration with popular Rails gems
 
+## [1.1.0] - 2025-10-24
+
+### Added
+- **Ruby Refactoring Expert Skill** - Autonomous code smell identification and refactoring guidance
+- **Rails Architecture Skill** - Automatic architectural decision support and design patterns
+
+### Changed
+- Plugin now includes 2 autonomous Skills that Claude invokes based on context
+- Updated description to highlight Skills capability
+
 ## [1.0.0] - 2025-10-24
 
 ### Added
