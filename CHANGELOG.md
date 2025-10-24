@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **project-manager-backlog** agent - Not core to Rails development
+- **backlog-task-coordinator** agent - Not core to Rails development
+
 ### Planned
 - Additional documentation and examples
 - Video tutorials for agent usage
@@ -26,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Initial release of Rails Dev Plugin
-- 12 specialized agents for Rails development:
+- 10 specialized agents for Rails development:
   - `rails-model` - Model development and database design
   - `rails-controller` - Controller and routing expertise
   - `rails-views` - ViewComponent and frontend development
@@ -37,8 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `rails-graphql` - GraphQL API development
   - `rails-architect` - Architecture and design decisions
   - `rails-devops` - Deployment and operations
-  - `project-manager-backlog` - Task management with Backlog.md
-  - `backlog-task-coordinator` - Multi-agent task coordination
 - Professional README with installation instructions
 - MIT License
 - Contributing guidelines

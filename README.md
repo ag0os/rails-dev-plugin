@@ -1,11 +1,11 @@
 # Rails Dev Plugin
 
-> Comprehensive Claude Code plugin with 12 specialized agents for Rails development
+> Comprehensive Claude Code plugin with specialized agents for Rails development
 
 [![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/your-username/rails-dev-plugin/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-A powerful Claude Code plugin that provides 12 specialized AI agents and 2 autonomous Skills to assist with all aspects of Rails application development. From models and controllers to architecture decisions and DevOps, this plugin has you covered.
+A powerful Claude Code plugin that provides specialized AI agents and autonomous Skills to assist with all aspects of Rails application development. From models and controllers to architecture decisions and DevOps, this plugin has you covered.
 
 ## 🚀 Quick Start
 
@@ -32,7 +32,7 @@ Claude: I'll use the rails-model agent to help...
 
 ## ✨ Features
 
-### 🤖 12 Specialized Agents
+### 🤖 Specialized Agents
 
 This plugin includes expert agents for every aspect of Rails development.
 
@@ -64,10 +64,6 @@ Skills that Claude invokes automatically based on task context:
 #### **Architecture & Operations**
 - **rails-architect** - Architectural decisions, design patterns, system structure
 - **rails-devops** - Deployment, CI/CD, Docker, performance, monitoring
-
-#### **Project Management**
-- **project-manager-backlog** - Task creation and management using Backlog.md CLI
-- **backlog-task-coordinator** - Task analysis and multi-agent coordination
 
 ## 📖 Usage
 
@@ -109,8 +105,6 @@ You: "Have the rails-test agent help me improve test coverage"
 | `rails-graphql` | Building GraphQL APIs |
 | `rails-architect` | Architecture decisions, design reviews |
 | `rails-devops` | Deployment, CI/CD, infrastructure |
-| `project-manager-backlog` | Creating and managing tasks |
-| `backlog-task-coordinator` | Coordinating multiple agents |
 
 ## 🎯 Use Cases
 
@@ -217,9 +211,7 @@ Team members who trust the repository will automatically get the plugin.
 rails-dev-plugin/
 ├── .claude-plugin/
 │   └── plugin.json          # Plugin metadata
-├── agents/                   # 12 specialized agents
-│   ├── backlog-task-coordinator.md
-│   ├── project-manager-backlog.md
+├── agents/                   # Specialized agents
 │   ├── rails-architect.md
 │   ├── rails-controller.md
 │   ├── rails-devops.md
@@ -230,7 +222,7 @@ rails-dev-plugin/
 │   ├── rails-stimulus-turbo.md
 │   ├── rails-test.md
 │   └── rails-views.md
-├── skills/                   # 2 autonomous Skills
+├── skills/                   # Autonomous Skills
 │   ├── ruby-refactoring/
 │   │   └── SKILL.md
 │   └── rails-architecture/

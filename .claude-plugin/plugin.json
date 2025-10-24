@@ -1,6 +1,6 @@
 {
   "name": "rails-dev-plugin",
-  "description": "Comprehensive Rails development plugin with 12 specialized agents and 2 Skills for models, controllers, views, services, jobs, testing, architecture, DevOps, refactoring, and project management.",
+  "description": "Comprehensive Rails development plugin with specialized agents and Skills for models, controllers, views, services, jobs, testing, architecture, DevOps, and refactoring.",
   "version": "1.1.0",
   "author": {
     "name": "ABSync Team"
@@ -11,7 +11,6 @@
     "insurance",
     "agents",
     "development",
-    "backlog",
     "jumpstart-pro"
   ]
 }
