@@ -1,0 +1,17 @@
+{
+  "name": "rails-dev-plugin",
+  "description": "Comprehensive Rails development plugin with 12 specialized agents for models, controllers, views, services, jobs, testing, architecture, DevOps, and project management. No commands included - focuses purely on expert agent guidance.",
+  "version": "1.0.0",
+  "author": {
+    "name": "ABSync Team"
+  },
+  "homepage": "https://github.com/your-org/rails-dev-plugin",
+  "keywords": [
+    "rails",
+    "insurance",
+    "agents",
+    "development",
+    "backlog",
+    "jumpstart-pro"
+  ]
+}
