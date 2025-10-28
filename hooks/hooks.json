@@ -1,5 +1,6 @@
 {
-  "PostToolUse": [
+  "hooks": {
+    "PostToolUse": [
     {
       "matcher": "Edit.*\\.rb$",
       "hooks": [
@@ -55,4 +56,5 @@
       ]
     }
   ]
+  }
 }
