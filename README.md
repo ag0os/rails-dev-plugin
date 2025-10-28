@@ -69,15 +69,11 @@ Claude: I'll use the rails-model agent to help...
 
 This plugin includes expert agents for every aspect of Rails development.
 
-### 🎯 5 Autonomous Skills
+### 🎯 1 Autonomous Skill
 
-Skills that Claude invokes automatically based on task context:
+Skill that Claude invokes automatically based on task context:
 
 - **Ruby Refactoring Expert** - Code smell identification, refactoring patterns, Ruby best practices
-- **Rails Architecture** - Architectural guidance, design patterns, service layer decisions
-- **Rails Performance Analyzer** - N+1 query detection, bottleneck identification, optimization recommendations
-- **Rails Security Auditor** - Security vulnerability scanning, SQL injection detection, authorization review
-- **Rails Upgrade Assistant** - Rails version upgrade planning, deprecation handling, breaking change guidance
 
 ### Agent Catalog
 
@@ -260,20 +256,11 @@ rails-dev-plugin/
 │   ├── rails-stimulus-turbo.md
 │   ├── rails-test.md
 │   └── rails-views.md
-├── skills/                         # 5 autonomous Skills
-│   ├── ruby-refactoring/
-│   │   ├── SKILL.md
-│   │   ├── code-smells.md
-│   │   └── refactoring-patterns.md
-│   ├── rails-architecture/
-│   │   ├── SKILL.md
-│   │   └── authorization-patterns.md
-│   ├── rails-performance-analyzer/
-│   │   └── SKILL.md
-│   ├── rails-security-auditor/
-│   │   └── SKILL.md
-│   └── rails-upgrade-assistant/
-│       └── SKILL.md
+├── skills/                         # 1 autonomous Skill
+│   └── ruby-refactoring/
+│       ├── SKILL.md
+│       ├── code-smells.md
+│       └── refactoring-patterns.md
 ├── docs/
 │   ├── quick-start.md             # Common workflows
 │   └── agent-decision-tree.md     # Agent selection guide
