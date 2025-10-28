@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Added missing `marketplace.json` file for proper marketplace installation
+
 ### Planned
 - Video tutorials for agent usage
 - Integration with popular Rails gems
