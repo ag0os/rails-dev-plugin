@@ -177,14 +177,14 @@ You: "I need tests for the PaymentProcessor service"
 ### Option 1: From GitHub (Recommended)
 
 ```shell
-/plugin marketplace add your-username/rails-dev-plugin
-/plugin install rails-dev-plugin@your-username
+/plugin marketplace add ag0os/rails-dev-plugin
+/plugin install rails-dev-plugin@ag0os
 ```
 
 ### Option 2: From Local Clone
 
 ```bash
-git clone https://github.com/your-username/rails-dev-plugin.git
+git clone https://github.com/ag0os/rails-dev-plugin.git
 cd your-rails-project
 claude
 ```
@@ -204,7 +204,7 @@ Add to your project's `.claude/settings.json`:
     "marketplaces": [
       {
         "name": "rails-dev-tools",
-        "source": "your-username/rails-dev-plugin"
+        "source": "ag0os/rails-dev-plugin"
       }
     ],
     "installed": [
@@ -222,23 +222,23 @@ Team members who trust the repository will automatically get the plugin.
 
 ```shell
 # Disable (keeps installed)
-/plugin disable rails-dev-plugin@your-username
+/plugin disable rails-dev-plugin@ag0os
 
 # Re-enable
-/plugin enable rails-dev-plugin@your-username
+/plugin enable rails-dev-plugin@ag0os
 ```
 
 ### Update
 
 ```shell
-/plugin uninstall rails-dev-plugin@your-username
-/plugin install rails-dev-plugin@your-username
+/plugin uninstall rails-dev-plugin@ag0os
+/plugin install rails-dev-plugin@ag0os
 ```
 
 ### Uninstall
 
 ```shell
-/plugin uninstall rails-dev-plugin@your-username
+/plugin uninstall rails-dev-plugin@ag0os
 ```
 
 ## 🏗 Plugin Structure
@@ -274,8 +274,6 @@ rails-dev-plugin/
 │   │   └── SKILL.md
 │   └── rails-upgrade-assistant/
 │       └── SKILL.md
-├── hooks/
-│   └── hooks.json                 # Rails-specific automation hooks
 ├── docs/
 │   ├── quick-start.md             # Common workflows
 │   └── agent-decision-tree.md     # Agent selection guide
@@ -335,7 +333,7 @@ Error: Plugin not found
 
 **Solution**: Verify the marketplace was added correctly:
 ```shell
-/plugin marketplace add your-username/rails-dev-plugin
+/plugin marketplace add ag0os/rails-dev-plugin
 ```
 
 ### Agents Not Available
@@ -346,8 +344,8 @@ Error: Plugin not found
 
 **Solution**: Check the agent's markdown file for proper formatting and update the plugin:
 ```shell
-/plugin uninstall rails-dev-plugin@your-username
-/plugin install rails-dev-plugin@your-username
+/plugin uninstall rails-dev-plugin@ag0os
+/plugin install rails-dev-plugin@ag0os
 ```
 
 ## 📚 Documentation

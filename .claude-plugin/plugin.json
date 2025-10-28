@@ -1,6 +1,6 @@
 {
   "name": "rails-dev-plugin",
-  "description": "Comprehensive Rails development plugin with 10 specialized agents and autonomous Skills for models, controllers, views, services, jobs, testing, architecture, DevOps, GraphQL, Hotwire, and refactoring. Includes hooks for automation and MCP integration for Rails documentation.",
+  "description": "Comprehensive Rails development plugin with 10 specialized agents and 5 autonomous Skills for models, controllers, views, services, jobs, testing, architecture, DevOps, GraphQL, Hotwire, refactoring, performance, security, and Rails upgrades. Includes MCP integration for Rails documentation.",
   "version": "1.2.0",
   "author": {
     "name": "ag0os",

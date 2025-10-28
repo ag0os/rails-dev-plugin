@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Claude Code plugin that provides 10 specialized agents and 2 autonomous Skills for Rails application development. The plugin is distributed via Claude Code's plugin marketplace and installed into Rails projects.
+This is a Claude Code plugin that provides 10 specialized agents and 5 autonomous Skills for Rails application development. The plugin is distributed via Claude Code's plugin marketplace and installed into Rails projects.
 
 ## Repository Structure
 
@@ -23,14 +23,20 @@ rails-dev-plugin/
 │   ├── rails-graphql.md
 │   ├── rails-architect.md
 │   └── rails-devops.md
-└── skills/                   # 2 autonomous Skills
+└── skills/                   # 5 autonomous Skills
     ├── ruby-refactoring/
     │   ├── SKILL.md
     │   ├── code-smells.md
     │   └── refactoring-patterns.md
-    └── rails-architecture/
-        ├── SKILL.md
-        └── authorization-patterns.md
+    ├── rails-architecture/
+    │   ├── SKILL.md
+    │   └── authorization-patterns.md
+    ├── rails-performance-analyzer/
+    │   └── SKILL.md
+    ├── rails-security-auditor/
+    │   └── SKILL.md
+    └── rails-upgrade-assistant/
+        └── SKILL.md
 ```
 
 ## Architecture
@@ -52,6 +58,9 @@ Skills are autonomous capabilities that Claude invokes automatically based on ta
 
 **Ruby Refactoring Expert Skill**: Analyzes code quality, identifies smells, suggests refactoring patterns
 **Rails Architecture Skill**: Provides architectural guidance for design decisions
+**Rails Performance Analyzer Skill**: N+1 query detection, bottleneck identification, optimization recommendations
+**Rails Security Auditor Skill**: Security vulnerability scanning, SQL injection detection, authorization review
+**Rails Upgrade Assistant Skill**: Rails version upgrade planning, deprecation handling, breaking change guidance
 
 ## Development Workflow
 

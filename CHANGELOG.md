@@ -22,11 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `Rails Performance Analyzer` - N+1 query detection, bottleneck identification, optimization recommendations
   - `Rails Security Auditor` - Security vulnerability scanning, SQL injection detection, authorization review
   - `Rails Upgrade Assistant` - Rails version upgrade planning, deprecation handling, breaking change guidance
-- **Hooks Configuration** (`hooks/hooks.json`):
-  - RuboCop auto-correction on file edits
-  - Migration safety reminders
-  - Production deployment checklist prompts
-  - File deletion warnings
 - **MCP Integration** (`.mcp.json`):
   - Rails documentation access (guides.rubyonrails.org, api.rubyonrails.org)
   - Hotwire documentation access (Turbo, Stimulus)
@@ -67,14 +62,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Agent colors now follow semantic scheme for better visual organization
 - Tools restrictions improve security and agent focus
 - MCP servers enable real-time Rails documentation access
-- Hooks automate common Rails development workflows
 
 ### Migration Notes
 For users upgrading from 1.1.0:
 - No breaking changes
 - Existing agents work as before but with enhanced triggering
 - New Skills activate automatically
-- Hooks are opt-in (configure in project's `.claude/settings.json`)
 - Update installation command to use `ag0os/rails-dev-plugin`
 
 ## [1.1.0] - 2025-10-24
