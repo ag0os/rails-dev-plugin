@@ -23,6 +23,16 @@ Install directly from GitHub in any Rails project:
 
 For teams, add to your Rails project's `.claude/settings.json`:
 
+```bash
+# Copy the example template
+mkdir -p .claude
+cp examples/project-settings/rails-project.json .claude/settings.json
+git add .claude/settings.json
+git commit -m "Enable Rails Dev Plugin for team"
+```
+
+Or create manually:
+
 ```json
 {
   "plugins": {
@@ -39,6 +49,10 @@ For teams, add to your Rails project's `.claude/settings.json`:
 ```
 
 Commit this file to your repository. Team members will automatically get the plugin on first Claude Code launch.
+
+### Per-Project Control
+
+To disable the plugin in non-Rails projects, see [examples/project-settings/](examples/project-settings/) for template configurations.
 
 ### First Use
 
@@ -232,7 +246,8 @@ Team members who trust the repository will automatically get the plugin.
 ```
 rails-dev-plugin/
 ├── .claude-plugin/
-│   └── plugin.json                # Plugin metadata
+│   ├── plugin.json                # Plugin metadata
+│   └── marketplace.json           # Marketplace configuration
 ├── .mcp.json                      # MCP server configuration
 ├── agents/                         # 10 specialized agents
 │   ├── rails-architect.md
@@ -264,6 +279,11 @@ rails-dev-plugin/
 ├── docs/
 │   ├── quick-start.md             # Common workflows
 │   └── agent-decision-tree.md     # Agent selection guide
+├── examples/
+│   └── project-settings/          # Example .claude/settings.json files
+│       ├── rails-project.json
+│       ├── non-rails-project.json
+│       └── README.md
 ├── CHANGELOG.md
 ├── CONTRIBUTING.md
 ├── LICENSE

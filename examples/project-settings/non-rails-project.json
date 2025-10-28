@@ -1,0 +1,5 @@
+{
+  "plugins": {
+    "disabled": ["rails-dev-plugin@ag0os"]
+  }
+}

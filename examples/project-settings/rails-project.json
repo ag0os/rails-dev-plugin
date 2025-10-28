@@ -1,0 +1,12 @@
+{
+  "plugins": {
+    "marketplaces": [
+      {
+        "name": "rails-dev",
+        "source": "ag0os/rails-dev-plugin"
+      }
+    ],
+    "installed": ["rails-dev-plugin@rails-dev"],
+    "autoInstall": true
+  }
+}
