@@ -1,6 +1,6 @@
 ---
 name: Rails Architecture
-description: Provides architectural guidance for Rails applications including design patterns, service layer architecture, model organization, multi-tenancy patterns, and decision frameworks. Use when making architectural decisions, designing new features, evaluating refactoring approaches, or questions about Rails patterns and conventions in this project.
+description: Automatically invoked when making architectural decisions or design choices. Triggers on mentions of "architecture", "design pattern", "service object", "model organization", "multi-tenant", "authorization", "Pundit", "scope", "where should this go", "best practice", "Rails way", "convention", "layer", "separation of concerns", "DDD", "domain model". Provides architectural guidance for Rails applications including design patterns, service layer architecture, model organization, multi-tenancy patterns, and decision frameworks.
 allowed-tools: Read, Grep, Glob
 ---
 

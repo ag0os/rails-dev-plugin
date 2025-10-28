@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "rails-guides": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-fetch"],
+      "env": {
+        "ALLOWED_DOMAINS": "guides.rubyonrails.org,api.rubyonrails.org,edgeguides.rubyonrails.org"
+      }
+    },
+    "hotwire-docs": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-fetch"],
+      "env": {
+        "ALLOWED_DOMAINS": "turbo.hotwired.dev,stimulus.hotwired.dev"
+      }
+    }
+  }
+}

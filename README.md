@@ -2,7 +2,7 @@
 
 > Comprehensive Claude Code plugin with specialized agents for Rails development
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/your-username/rails-dev-plugin/releases)
+[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/ag0os/rails-dev-plugin/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 A powerful Claude Code plugin that provides specialized AI agents and autonomous Skills to assist with all aspects of Rails application development. From models and controllers to architecture decisions and DevOps, this plugin has you covered.
@@ -15,11 +15,30 @@ Install directly from GitHub in any Rails project:
 
 ```shell
 # In Claude Code
-/plugin marketplace add your-username/rails-dev-plugin
-/plugin install rails-dev-plugin@your-username
+/plugin marketplace add ag0os/rails-dev-plugin
+/plugin install rails-dev-plugin@ag0os
 ```
 
-Replace `your-username` with the GitHub username/organization where you published this plugin.
+### Team-Wide Auto-Install
+
+For teams, add to your Rails project's `.claude/settings.json`:
+
+```json
+{
+  "plugins": {
+    "marketplaces": [
+      {
+        "name": "rails-dev",
+        "source": "ag0os/rails-dev-plugin"
+      }
+    ],
+    "installed": ["rails-dev-plugin@rails-dev"],
+    "autoInstall": true
+  }
+}
+```
+
+Commit this file to your repository. Team members will automatically get the plugin on first Claude Code launch.
 
 ### First Use
 
@@ -36,12 +55,15 @@ Claude: I'll use the rails-model agent to help...
 
 This plugin includes expert agents for every aspect of Rails development.
 
-### 🎯 2 Autonomous Skills
+### 🎯 5 Autonomous Skills
 
 Skills that Claude invokes automatically based on task context:
 
 - **Ruby Refactoring Expert** - Code smell identification, refactoring patterns, Ruby best practices
 - **Rails Architecture** - Architectural guidance, design patterns, service layer decisions
+- **Rails Performance Analyzer** - N+1 query detection, bottleneck identification, optimization recommendations
+- **Rails Security Auditor** - Security vulnerability scanning, SQL injection detection, authorization review
+- **Rails Upgrade Assistant** - Rails version upgrade planning, deprecation handling, breaking change guidance
 
 ### Agent Catalog
 
@@ -210,8 +232,9 @@ Team members who trust the repository will automatically get the plugin.
 ```
 rails-dev-plugin/
 ├── .claude-plugin/
-│   └── plugin.json          # Plugin metadata
-├── agents/                   # Specialized agents
+│   └── plugin.json                # Plugin metadata
+├── .mcp.json                      # MCP server configuration
+├── agents/                         # 10 specialized agents
 │   ├── rails-architect.md
 │   ├── rails-controller.md
 │   ├── rails-devops.md
@@ -222,15 +245,29 @@ rails-dev-plugin/
 │   ├── rails-stimulus-turbo.md
 │   ├── rails-test.md
 │   └── rails-views.md
-├── skills/                   # Autonomous Skills
+├── skills/                         # 5 autonomous Skills
 │   ├── ruby-refactoring/
+│   │   ├── SKILL.md
+│   │   ├── code-smells.md
+│   │   └── refactoring-patterns.md
+│   ├── rails-architecture/
+│   │   ├── SKILL.md
+│   │   └── authorization-patterns.md
+│   ├── rails-performance-analyzer/
 │   │   └── SKILL.md
-│   └── rails-architecture/
+│   ├── rails-security-auditor/
+│   │   └── SKILL.md
+│   └── rails-upgrade-assistant/
 │       └── SKILL.md
-├── CHANGELOG.md             # Version history
-├── CONTRIBUTING.md          # Contribution guidelines
-├── LICENSE                  # MIT License
-└── README.md               # This file
+├── hooks/
+│   └── hooks.json                 # Rails-specific automation hooks
+├── docs/
+│   ├── quick-start.md             # Common workflows
+│   └── agent-decision-tree.md     # Agent selection guide
+├── CHANGELOG.md
+├── CONTRIBUTING.md
+├── LICENSE
+└── README.md
 ```
 
 ## 🤝 Contributing
@@ -252,6 +289,21 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for det
 - Claude Code installed and running
 - Rails project (any version, but optimized for Rails 7+)
 - Ruby 3.0+ recommended
+
+## 🔄 Compatibility Matrix
+
+| Rails Version | Ruby Version | Plugin Version | Status |
+|---------------|--------------|----------------|---------|
+| 7.1.x         | 3.2+         | 1.2.0+         | ✅ Fully Supported |
+| 7.0.x         | 3.0+         | 1.2.0+         | ✅ Fully Supported |
+| 6.1.x         | 2.7+         | 1.2.0+         | ✅ Supported |
+| 6.0.x         | 2.7+         | 1.2.0+         | ⚠️ Basic Support |
+| 5.2.x         | 2.5+         | 1.0.0+         | ⚠️ Limited Support |
+
+**Notes**:
+- Agents provide best practices for latest Rails versions
+- Older Rails versions supported with appropriate guidance
+- Some features (like Hotwire agents) require Rails 7+
 
 ## 🐛 Troubleshooting
 
@@ -280,6 +332,8 @@ Error: Plugin not found
 
 ## 📚 Documentation
 
+- **[Quick Start Guide](docs/quick-start.md)** - Common workflows and examples
+- **[Agent Decision Tree](docs/agent-decision-tree.md)** - Which agent to use when
 - [Agent Development Guide](docs/agent-development.md) *(coming soon)*
 - [Best Practices](docs/best-practices.md) *(coming soon)*
 - [FAQ](docs/faq.md) *(coming soon)*
@@ -300,9 +354,11 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 💬 Support
 
-- **Issues**: [GitHub Issues](https://github.com/your-username/rails-dev-plugin/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-username/rails-dev-plugin/discussions)
+- **Issues**: [GitHub Issues](https://github.com/ag0os/rails-dev-plugin/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/ag0os/rails-dev-plugin/discussions)
 - **Updates**: Watch this repository for updates
+- **Quick Start**: [docs/quick-start.md](docs/quick-start.md)
+- **Agent Guide**: [docs/agent-decision-tree.md](docs/agent-decision-tree.md)
 
 ## ⭐️ Show Your Support
 

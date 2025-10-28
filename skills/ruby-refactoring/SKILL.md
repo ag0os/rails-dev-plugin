@@ -1,6 +1,6 @@
 ---
 name: Ruby Refactoring Expert
-description: Provides Ruby refactoring patterns and code smell identification based on Ruby Science methodology. Use when reviewing code quality, identifying code smells, planning refactoring work, improving test coverage, or analyzing recently written Ruby/Rails code for maintainability improvements.
+description: Automatically invoked when analyzing code quality, refactoring, or maintainability. Triggers on mentions of "code smell", "refactor", "code quality", "technical debt", "complexity", "maintainability", "clean code", "SOLID", "DRY", "improve code", "simplify", "extract method", "extract class", "long method", "large class", "duplication". Provides Ruby refactoring patterns and code smell identification based on Ruby Science methodology for recently written Ruby/Rails code.
 allowed-tools: Read, Grep, Glob
 ---
 

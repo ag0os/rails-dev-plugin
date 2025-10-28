@@ -1,16 +1,34 @@
 {
   "name": "rails-dev-plugin",
-  "description": "Comprehensive Rails development plugin with specialized agents and Skills for models, controllers, views, services, jobs, testing, architecture, DevOps, and refactoring.",
-  "version": "1.1.0",
+  "description": "Comprehensive Rails development plugin with 10 specialized agents and autonomous Skills for models, controllers, views, services, jobs, testing, architecture, DevOps, GraphQL, Hotwire, and refactoring. Includes hooks for automation and MCP integration for Rails documentation.",
+  "version": "1.2.0",
   "author": {
-    "name": "ABSync Team"
+    "name": "ag0os",
+    "url": "https://github.com/ag0os"
   },
-  "homepage": "https://github.com/your-org/rails-dev-plugin",
+  "homepage": "https://github.com/ag0os/rails-dev-plugin",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ag0os/rails-dev-plugin.git"
+  },
   "keywords": [
     "rails",
-    "insurance",
+    "ruby",
     "agents",
     "development",
-    "jumpstart-pro"
-  ]
+    "testing",
+    "architecture",
+    "devops",
+    "refactoring",
+    "graphql",
+    "hotwire",
+    "stimulus",
+    "turbo",
+    "activerecord",
+    "pundit"
+  ],
+  "license": "MIT",
+  "engines": {
+    "claude-code": ">=1.0.0"
+  }
 }
