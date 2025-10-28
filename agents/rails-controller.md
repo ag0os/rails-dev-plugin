@@ -94,7 +94,7 @@ Remember: Controllers should be thin coordinators. Business logic belongs in mod
 
 ## MCP-Enhanced Capabilities
 
-When Context7 MCP Server is available, leverage Rails controller and routing documentation:
+When DeepWiki MCP Server is available, leverage Rails controller and routing documentation:
 - **Routing Documentation**: Access comprehensive routing guides and DSL reference
 - **Controller Patterns**: Reference ActionController methods and modules
 - **Security Guidelines**: Query official security best practices
