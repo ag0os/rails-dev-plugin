@@ -6,7 +6,7 @@
   "plugins": [
     {
       "name": "rails-dev-plugin",
-      "source": ".",
+      "source": "./",
       "description": "Comprehensive Rails development plugin with 10 specialized agents and 5 autonomous Skills for models, controllers, views, services, jobs, testing, architecture, DevOps, GraphQL, Hotwire, and refactoring"
     }
   ]
