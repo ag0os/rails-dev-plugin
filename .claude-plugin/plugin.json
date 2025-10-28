@@ -7,10 +7,7 @@
     "url": "https://github.com/ag0os"
   },
   "homepage": "https://github.com/ag0os/rails-dev-plugin",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/ag0os/rails-dev-plugin.git"
-  },
+  "repository": "https://github.com/ag0os/rails-dev-plugin.git",
   "keywords": [
     "rails",
     "ruby",
@@ -27,8 +24,5 @@
     "activerecord",
     "pundit"
   ],
-  "license": "MIT",
-  "engines": {
-    "claude-code": ">=1.0.0"
-  }
+  "license": "MIT"
 }
