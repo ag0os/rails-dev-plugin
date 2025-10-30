@@ -5,7 +5,7 @@
 [![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/ag0os/rails-dev-plugin/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-A powerful Claude Code plugin that provides specialized AI agents and autonomous Skills to assist with all aspects of Rails application development. From models and controllers to architecture decisions and DevOps, this plugin has you covered.
+A Claude Code plugin that provides specialized AI agents and autonomous Skills to assist with all aspects of Rails application development. From models and controllers to architecture decisions and DevOps, this plugin has you covered.
 
 ## 🚀 Quick Start
 
@@ -65,37 +65,26 @@ Claude: I'll use the rails-model agent to help...
 
 ## ✨ Features
 
-### 🤖 Specialized Agents
+### 🤖 10 Specialized Agents
 
-This plugin includes expert agents for every aspect of Rails development.
+Expert agents for every aspect of Rails development:
+
+| Agent | Domain | Specialization |
+|-------|--------|----------------|
+| `rails-model` | Backend | ActiveRecord models, migrations, associations, validations, schema design |
+| `rails-controller` | Backend | RESTful controllers, authentication/authorization, Pundit policies |
+| `rails-service` | Backend | Service objects, business logic extraction, command/query patterns |
+| `rails-jobs` | Backend | Background jobs, Active Job, Sidekiq, job scheduling |
+| `rails-views` | Frontend | ViewComponents, ERB templates, TailwindCSS, modern UI patterns |
+| `rails-stimulus-turbo` | Frontend | Hotwire, Stimulus controllers, Turbo frames/streams |
+| `rails-graphql` | API | GraphQL schema design, resolvers, mutations, query optimization |
+| `rails-test` | Testing | TDD with Minitest/RSpec, test coverage, fixtures, system tests |
+| `rails-architect` | Architecture | Architectural decisions, design patterns, system structure |
+| `rails-devops` | Operations | Deployment, CI/CD, Docker, performance, monitoring |
 
 ### 🎯 1 Autonomous Skill
 
-Skill that Claude invokes automatically based on task context:
-
 - **Ruby Refactoring Expert** - Code smell identification, refactoring patterns, Ruby best practices
-
-### Agent Catalog
-
-#### **Backend Development**
-- **rails-model** - ActiveRecord models, migrations, associations, validations, and database schema design
-- **rails-controller** - RESTful controllers, authentication/authorization, Pundit policies
-- **rails-service** - Service objects, business logic extraction, command/query patterns
-- **rails-jobs** - Background jobs, Active Job, Sidekiq, job scheduling
-
-#### **Frontend Development**
-- **rails-views** - ViewComponents, ERB templates, TailwindCSS, modern UI patterns
-- **rails-stimulus-turbo** - Hotwire, Stimulus controllers, Turbo frames/streams
-
-#### **API Development**
-- **rails-graphql** - GraphQL schema design, resolvers, mutations, query optimization
-
-#### **Testing & Quality**
-- **rails-test** - TDD with Minitest/RSpec, test coverage, fixtures, system tests
-
-#### **Architecture & Operations**
-- **rails-architect** - Architectural decisions, design patterns, system structure
-- **rails-devops** - Deployment, CI/CD, Docker, performance, monitoring
 
 ## 📖 Usage
 
@@ -122,21 +111,6 @@ You can also explicitly request specific agents:
 You: "Use the rails-architect agent to review my service layer design"
 You: "Have the rails-test agent help me improve test coverage"
 ```
-
-### Agent Quick Reference
-
-| Agent | Best For |
-|-------|----------|
-| `rails-model` | Creating/modifying models, migrations, associations, validations |
-| `rails-controller` | Building controllers, handling requests, authorization |
-| `rails-views` | Creating views, components, frontend styling |
-| `rails-service` | Extracting business logic, service objects |
-| `rails-jobs` | Background processing, async tasks |
-| `rails-test` | Writing tests, improving coverage |
-| `rails-stimulus-turbo` | Adding interactivity, Hotwire features |
-| `rails-graphql` | Building GraphQL APIs |
-| `rails-architect` | Architecture decisions, design reviews |
-| `rails-devops` | Deployment, CI/CD, infrastructure |
 
 ## 🎯 Use Cases
 
@@ -167,50 +141,6 @@ You: "The posts#index action is slow with 1000+ records"
 You: "I need tests for the PaymentProcessor service"
 → rails-test creates comprehensive test suite with edge cases
 ```
-
-## 🛠 Installation Options
-
-### Option 1: From GitHub (Recommended)
-
-```shell
-/plugin marketplace add ag0os/rails-dev-plugin
-/plugin install rails-dev-plugin@ag0os
-```
-
-### Option 2: From Local Clone
-
-```bash
-git clone https://github.com/ag0os/rails-dev-plugin.git
-cd your-rails-project
-claude
-```
-
-```shell
-/plugin marketplace add /path/to/rails-dev-plugin
-/plugin install rails-dev-plugin@local
-```
-
-### Option 3: Team-Wide Auto-Install
-
-Add to your project's `.claude/settings.json`:
-
-```json
-{
-  "plugins": {
-    "marketplaces": [
-      {
-        "name": "rails-dev-tools",
-        "source": "ag0os/rails-dev-plugin"
-      }
-    ],
-    "installed": [
-      "rails-dev-plugin@rails-dev-tools"
-    ]
-  }
-}
-```
-
-Team members who trust the repository will automatically get the plugin.
 
 ## 🎛 Management
 
@@ -288,27 +218,6 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for det
 5. Commit your changes (`git commit -m 'Add amazing new agent'`)
 6. Push to the branch (`git push origin feature/amazing-agent`)
 7. Open a Pull Request
-
-## 📋 Requirements
-
-- Claude Code installed and running
-- Rails project (any version, but optimized for Rails 7+)
-- Ruby 3.0+ recommended
-
-## 🔄 Compatibility Matrix
-
-| Rails Version | Ruby Version | Plugin Version | Status |
-|---------------|--------------|----------------|---------|
-| 7.1.x         | 3.2+         | 1.2.0+         | ✅ Fully Supported |
-| 7.0.x         | 3.0+         | 1.2.0+         | ✅ Fully Supported |
-| 6.1.x         | 2.7+         | 1.2.0+         | ✅ Supported |
-| 6.0.x         | 2.7+         | 1.2.0+         | ⚠️ Basic Support |
-| 5.2.x         | 2.5+         | 1.0.0+         | ⚠️ Limited Support |
-
-**Notes**:
-- Agents provide best practices for latest Rails versions
-- Older Rails versions supported with appropriate guidance
-- Some features (like Hotwire agents) require Rails 7+
 
 ## 🐛 Troubleshooting
 
