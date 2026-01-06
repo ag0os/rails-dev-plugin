@@ -156,6 +156,63 @@ Rails.application.routes.draw do
 end
 ```
 
+### Resource-Based Controllers (Preferred Pattern)
+
+Instead of custom member actions, create dedicated resource controllers. This pattern treats state changes as resources themselves, providing cleaner RESTful design.
+
+**Context Awareness**: Always applicable - improves on traditional custom actions.
+
+```ruby
+# Bad - custom actions
+resources :cards do
+  post :close
+  post :reopen
+  post :pin
+  post :unpin
+end
+
+# Good - resource controllers
+resources :cards do
+  scope module: :cards do
+    resource :closure      # create = close, destroy = reopen
+    resource :pin          # create = pin, destroy = unpin
+    resource :watch        # create = watch, destroy = unwatch
+    resource :goldness     # create = gild, destroy = ungild
+    resource :triage       # create = move to triage
+  end
+end
+```
+
+**Example Controller Implementation**:
+
+```ruby
+class Cards::ClosuresController < ApplicationController
+  include CardScoped
+
+  def create
+    @card.close
+    respond_to do |format|
+      format.turbo_stream { render_card_replacement }
+      format.json { head :no_content }
+    end
+  end
+
+  def destroy
+    @card.reopen
+    respond_to do |format|
+      format.turbo_stream { render_card_replacement }
+      format.json { head :no_content }
+    end
+  end
+end
+```
+
+**Benefits**:
+- RESTful HTTP verbs (POST to create state, DELETE to remove state)
+- Clear, focused controllers
+- Easier to test and maintain
+- Natural fit with Turbo Streams
+
 ### Nested Resources
 
 ```ruby
@@ -200,11 +257,44 @@ root 'home#index'
 
 ## Strong Parameters Patterns
 
-### Basic Usage
+### Modern Strong Params (Rails 7.1+)
+
+**Context Awareness**: Check Rails version before using `params.expect`
+- Rails >= 7.1: Use `params.expect` (cleaner, more secure)
+- Rails < 7.1: Use `params.require().permit()` (traditional)
+
+**Check Rails version**:
+```bash
+# In Gemfile.lock, look for:
+rails (7.1.x)
+```
+
+**Rails 7.1+ - Preferred**:
 
 ```ruby
 def post_params
   params.expect(post: [:title, :content, :published])
+end
+
+def webhook_params
+  params
+    .expect(webhook: [:name, :url, subscribed_actions: []])
+    .merge(board_id: @board.id)
+end
+```
+
+**Rails < 7.1 - Fallback**:
+
+```ruby
+def post_params
+  params.require(:post).permit(:title, :content, :published)
+end
+
+def webhook_params
+  params
+    .require(:webhook)
+    .permit(:name, :url, subscribed_actions: [])
+    .merge(board_id: @board.id)
 end
 ```
 
@@ -247,6 +337,56 @@ end
 
 ## Concerns
 
+### Layered Controller Concerns (Recommended Pattern)
+
+Create concerns that combine before_actions with reusable helper methods. This pattern provides cleaner, more maintainable controllers with shared scoping logic.
+
+**Context Awareness**: Always applicable - improves code reuse and consistency.
+
+```ruby
+# app/controllers/concerns/card_scoped.rb
+module CardScoped
+  extend ActiveSupport::Concern
+
+  included do
+    before_action :set_card, :set_board
+  end
+
+  private
+    def set_card
+      @card = Current.user.accessible_cards.find_by!(number: params[:card_id])
+    end
+
+    def set_board
+      @board = @card.board
+    end
+
+    def render_card_replacement
+      render turbo_stream: turbo_stream.replace(
+        [@card, :card_container],
+        partial: "cards/container",
+        method: :morph,
+        locals: { card: @card.reload }
+      )
+    end
+end
+
+# Usage in multiple controllers
+class Cards::ClosuresController < ApplicationController
+  include CardScoped
+end
+
+class Cards::PinsController < ApplicationController
+  include CardScoped
+end
+```
+
+**Benefits**:
+- Combines related before_actions and helper methods
+- Reduces duplication across resource controllers
+- Clear dependencies and setup
+- Easy to test in isolation
+
 ### Shared Behavior
 
 ```ruby
@@ -279,6 +419,67 @@ class PostsController < ApplicationController
   include Searchable
 end
 ```
+
+## Authorization Patterns
+
+### Model-Based Authorization (Alternative to Pundit/CanCanCan)
+
+**Context Awareness**: IMPORTANT - Check project dependencies first!
+
+**Detection**: Check `Gemfile` for authorization gems:
+```ruby
+# If you find these, DO NOT use model-based auth:
+gem 'pundit'
+gem 'cancancan'
+```
+
+**When to Use**:
+- New projects without existing authorization
+- Simple authorization needs
+- User explicitly asks to simplify/remove Pundit
+
+**When NOT to Use**:
+- Pundit or CanCanCan already installed
+- Complex permission requirements
+- Unless migrating away from these gems
+
+**Pattern** (use only if no auth gem present):
+
+```ruby
+# In controller
+class BoardsController < ApplicationController
+  before_action :set_board
+  before_action :ensure_permission_to_admin_board, only: [:edit, :update, :destroy]
+
+  private
+    def ensure_permission_to_admin_board
+      head :forbidden unless Current.user.can_administer_board?(@board)
+    end
+
+    def ensure_creatorship
+      head :forbidden if Current.user != @comment.creator
+    end
+end
+
+# In User model
+class User < ApplicationRecord
+  def can_administer_board?(board)
+    admin? || board.creator == self
+  end
+
+  def can_change?(other_user)
+    admin? || self == other_user
+  end
+end
+```
+
+**Benefits** (when applicable):
+- Simpler than full authorization frameworks
+- Authorization logic lives with domain models
+- Easy to understand and test
+- No DSL to learn
+
+**Migration Path**: Only suggest removing Pundit/CanCanCan if user explicitly asks to simplify authorization.
 
 ## Pagination Pattern
 
@@ -384,6 +585,41 @@ class Api::V1::BaseController < ActionController::API
 end
 ```
 
+## Context Awareness Reference
+
+Use this table to determine which patterns to apply based on project context:
+
+| Pattern | Detection Method | Conflicts/Blockers | Applicability |
+|---------|------------------|-------------------|---------------|
+| **Resource Controllers** | Check `config/routes.rb` for custom actions | None - additive pattern | **Always Applicable** - Improves on traditional custom actions |
+| **Layered Concerns** | Check `app/controllers/concerns/` | None - additive pattern | **Always Applicable** - Reduces duplication |
+| **Model-Based Auth** | Check `Gemfile` for `pundit`, `cancancan` | Pundit/CanCanCan installed | **Conditional** - Only if no auth gem OR explicit migration request |
+| **params.expect** | Check `Gemfile.lock` for Rails version (>= 7.1) | Rails < 7.1 | **Rails 7.1+** - Use modern syntax; fallback to .require().permit() for older |
+
+### Detection Steps
+
+**1. Check Rails Version**:
+```bash
+grep "rails (" Gemfile.lock
+# Look for: rails (7.1.x) or higher
+```
+
+**2. Check Authorization Gems**:
+```bash
+grep -E "gem ['\"]pundit|cancancan" Gemfile
+# If found: Use existing gem, don't suggest model-based auth
+# If not found: Model-based auth is an option
+```
+
+**3. Check Routing Style**:
+```ruby
+# In config/routes.rb, look for:
+resources :posts do
+  post :publish   # Custom action - candidate for resource controller
+  post :archive   # Custom action - candidate for resource controller
+end
+```
+
 ## Best Practices
 
 ### Do
@@ -392,6 +628,9 @@ end
 - Return appropriate status codes
 - Use strong parameters
 - Delegate business logic to models/services
+- Check project context before suggesting patterns (see Context Awareness Reference)
+- Prefer resource controllers over custom actions
+- Use layered concerns for shared setup logic
 
 ### Don't
 - Put business logic in controllers
@@ -399,3 +638,5 @@ end
 - Skip validation status codes
 - Nest resources more than one level deep
 - Create non-RESTful actions without good reason
+- Suggest model-based auth when Pundit/CanCanCan is installed
+- Use `params.expect` in Rails < 7.1
