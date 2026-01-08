@@ -1,7 +1,7 @@
 {
   "name": "rails-dev-plugin",
-  "description": "Comprehensive Rails development plugin with 10 specialized agents and 1 autonomous Skill for models, controllers, views, services, jobs, testing, architecture, DevOps, GraphQL, Hotwire, and Ruby refactoring. Includes MCP integration for Rails documentation.",
-  "version": "1.2.0",
+  "description": "Comprehensive Rails development plugin with 10 specialized agents and context-aware autonomous Skills for models, controllers, views, services, jobs, testing, architecture, DevOps, GraphQL, Hotwire, Ruby refactoring, and object-oriented design. Features 37signals-style Fizzy Architecture patterns with automatic detection of your project's gems, Ruby version, and conventions.",
+  "version": "1.3.0",
   "author": {
     "name": "ag0os",
     "url": "https://github.com/ag0os"
@@ -22,7 +22,12 @@
     "stimulus",
     "turbo",
     "activerecord",
-    "pundit"
+    "pundit",
+    "fizzy",
+    "37signals",
+    "context-aware",
+    "value-objects",
+    "object-design"
   ],
   "license": "MIT"
 }

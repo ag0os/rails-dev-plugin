@@ -318,8 +318,10 @@ Turbo::StreamsChannel.broadcast_prepend_to(
 
 ### Morphing (Turbo 8+)
 
+**Context Awareness**: Check Turbo version in `package.json`. Morphing requires Turbo >= 8.0.
+
 ```erb
-<%# Enable page refresh with morphing %>
+<%# Enable page refresh with morphing (Turbo 8.0+) %>
 <meta name="turbo-refresh-method" content="morph">
 <meta name="turbo-refresh-scroll" content="preserve">
 ```
@@ -327,6 +329,34 @@ Turbo::StreamsChannel.broadcast_prepend_to(
 ```ruby
 # Trigger morph refresh
 turbo_stream.refresh
+```
+
+**Stream-level morphing:**
+
+```erb
+<%# Turbo 8.0+ with morphing %>
+<%= turbo_stream.replace dom_id(@card, :card_container),
+    partial: "cards/container",
+    method: :morph,
+    locals: { card: @card.reload } %>
+
+<%# Turbo < 8.0 fallback (use standard replace) %>
+<%= turbo_stream.replace dom_id(@card, :card_container),
+    partial: "cards/container",
+    locals: { card: @card.reload } %>
+```
+
+**Benefits of morphing:**
+- Preserves element focus and scroll position
+- Maintains form input state
+- Keeps CSS transitions smooth
+- More efficient DOM updates
+
+**Detection:**
+```bash
+# Check package.json
+grep -A 1 "@hotwired/turbo-rails" package.json
+# If version >= 8.0, morphing is available
 ```
 
 ## Turbo Stream Custom Actions
@@ -378,3 +408,137 @@ Turbo.StreamActions.notification = function() {
   <audio src="..."></audio>
 </div>
 ```
+
+## Permanent Elements
+
+**Context Awareness**: Requires Turbo (any version). Not applicable to React/Vue SPAs.
+
+Permanent elements persist across page navigations and morphs, maintaining their state and subscriptions.
+
+```erb
+<%# Elements that should never change during navigation %>
+<div id="footer_frames" data-turbo-permanent="true">
+  <%= render "bar/bar" %>
+  <%= render "notifications/tray" %>
+</div>
+
+<%# Audio/video players %>
+<div id="media-player" data-turbo-permanent>
+  <audio controls src="<%= @podcast.audio_url %>"></audio>
+</div>
+
+<%# ActionCable connections %>
+<div id="notifications" data-turbo-permanent>
+  <%= turbo_stream_from current_user, "notifications" %>
+  <div id="notification-list"></div>
+</div>
+```
+
+**Use cases:**
+- Media players that should continue playing during navigation
+- Real-time notification systems
+- Chat widgets
+- Shopping cart indicators
+- Global progress indicators
+
+**Important:** The element must have a unique `id` and appear in the same position in the new page's DOM.
+
+## Fragment Caching with Turbo
+
+**Context Awareness**: Works with any Turbo version. Essential for performance in production.
+
+```erb
+<%# Cache individual items %>
+<% @comments.each do |comment| %>
+  <% cache comment do %>
+    <%= turbo_frame_tag comment, :container do %>
+      <div id="<%= dom_id(comment) %>">
+        <%= render comment %>
+      </div>
+    <% end %>
+  <% end %>
+<% end %>
+
+<%# Collection caching with custom cache keys %>
+<%= render partial: "boards/show/column",
+    collection: board.columns.sorted,
+    cached: ->(column) { [column, column.leftmost?, column.rightmost?] } %>
+
+<%# Cache with dependencies %>
+<% cache [@post, current_user] do %>
+  <%= turbo_frame_tag @post do %>
+    <%= render @post %>
+  <% end %>
+<% end %>
+```
+
+**Cache invalidation:**
+
+```ruby
+# app/models/comment.rb
+class Comment < ApplicationRecord
+  belongs_to :post, touch: true  # Invalidate post cache when comment changes
+
+  after_commit :broadcast_changes
+
+  private
+
+  def broadcast_changes
+    # Turbo Streams work seamlessly with caching
+    broadcast_replace_to post, "comments"
+  end
+end
+```
+
+**Best practices:**
+- Cache at the Turbo Frame level when possible
+- Use touch: true to invalidate parent caches
+- Include user in cache key for personalized content
+- Combine with Turbo Streams for instant updates
+
+## Context Awareness
+
+**Detecting Hotwire Apps:**
+
+```bash
+# Check if project uses Hotwire
+grep -E "@hotwired/(turbo-rails|stimulus)" package.json
+
+# Check Turbo version for morphing support
+grep "@hotwired/turbo-rails" package.json | grep -oE "[0-9]+\.[0-9]+"
+```
+
+**When Turbo Patterns Apply:**
+
+| Project Type | Turbo Applicable? | Notes |
+|--------------|-------------------|-------|
+| Rails + Hotwire | Yes | Use all patterns |
+| Rails + React SPA | No | Use React patterns instead |
+| Rails + Vue SPA | No | Use Vue patterns instead |
+| Rails + Importmap + Turbo | Yes | Standard Hotwire stack |
+| Rails API only | No | No frontend to enhance |
+
+**Pattern Version Requirements:**
+
+| Pattern | Turbo Version | Detection |
+|---------|---------------|-----------|
+| Turbo Frames | Any | Check for `@hotwired/turbo-rails` |
+| Turbo Streams | Any | Check for `@hotwired/turbo-rails` |
+| Morphing (`:morph` method) | >= 8.0 | Parse version from package.json |
+| Page Refresh | >= 7.2 | Parse version from package.json |
+| Permanent Elements | Any | Check for Turbo presence |
+
+**Conflict Detection:**
+
+```bash
+# Check for React (conflicts with Turbo patterns)
+grep -E "react|react-dom" package.json
+
+# Check for Vue (conflicts with Turbo patterns)
+grep -E "^vue" package.json
+
+# Check for heavy JavaScript framework usage
+ls app/javascript/components/ 2>/dev/null && echo "Component-based architecture detected"
+```
+
+**Recommendation:** If React/Vue is present with significant component usage, recommend their patterns over Turbo. Turbo works best with server-rendered HTML and progressive enhancement.

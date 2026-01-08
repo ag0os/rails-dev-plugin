@@ -295,6 +295,135 @@ class User < ApplicationRecord
 end
 ```
 
+## Advanced Patterns
+
+### Default Association Values
+
+Automatically derive association values from related records or current context.
+
+**Context Awareness:** Check for `app/models/current.rb` to determine if CurrentAttributes is available.
+
+```ruby
+# With CurrentAttributes (full pattern)
+# Check for: app/models/current.rb
+class Card < ApplicationRecord
+  belongs_to :account, default: -> { board.account }
+  belongs_to :creator, class_name: "User", default: -> { Current.user }
+  belongs_to :board, touch: true
+end
+
+class Closure < ApplicationRecord
+  belongs_to :account, default: -> { card.account }
+  belongs_to :card, touch: true
+  belongs_to :user, default: -> { Current.user }
+end
+
+# Without CurrentAttributes (still useful for derived values)
+class Card < ApplicationRecord
+  belongs_to :account, default: -> { board.account }
+  # creator must be passed explicitly without Current.user
+end
+```
+
+**Benefits:**
+- Eliminates explicit parameter passing in controllers
+- Leverages `Current` context automatically for user/tenant
+- Reduces boilerplate when creating nested records
+- Maintains referential integrity across associations
+
+**Usage in Controllers:**
+```ruby
+# Without defaults
+@card = @board.cards.create!(
+  account: @board.account,
+  creator: Current.user,
+  title: params[:title]
+)
+
+# With defaults - cleaner!
+@card = @board.cards.create!(title: params[:title])
+```
+
+### Association Extensions
+
+Add custom methods to association collections for domain-specific operations.
+
+```ruby
+class Board < ApplicationRecord
+  has_many :accesses, dependent: :delete_all do
+    def revise(granted: [], revoked: [])
+      transaction do
+        grant_to granted
+        revoke_from revoked
+      end
+    end
+
+    def grant_to(users)
+      Access.insert_all Array(users).collect { |user|
+        { id: ActiveRecord::Type::Uuid.generate,
+          board_id: proxy_association.owner.id,
+          user_id: user.id,
+          account_id: user.account_id }
+      }
+    end
+
+    def revoke_from(users)
+      destroy_by(user: users) unless proxy_association.owner.all_access?
+    end
+  end
+end
+
+# Usage - clean, expressive domain logic
+board.accesses.revise(granted: [user1, user2], revoked: [user3])
+```
+
+**Benefits:**
+- Encapsulates complex association operations
+- Provides expressive, domain-specific API
+- Keeps logic close to the data
+- Uses `proxy_association.owner` to access parent record
+
+**Common Use Cases:**
+- Batch operations (grant/revoke permissions)
+- Conditional modifications (soft delete, archiving)
+- Complex ordering or filtering logic
+- Transaction-wrapped multi-step operations
+
+### Self-Referential Convenience Methods
+
+Add identity methods for polymorphic code uniformity.
+
+```ruby
+class Card < ApplicationRecord
+  def card
+    self  # Allows polymorphic code to call .card uniformly
+  end
+end
+
+class Comment < ApplicationRecord
+  belongs_to :card
+
+  def card
+    super  # Delegates to association
+  end
+end
+
+class Account < ApplicationRecord
+  def account
+    self
+  end
+end
+
+# Enables uniform access patterns
+[card, comment, attachment].map(&:card)
+[card, board, account].map(&:account)
+```
+
+**Benefits:**
+- Simplifies polymorphic collection handling
+- No need for conditional logic to check record type
+- Cleaner, more uniform code in views and helpers
+
 ## Best Practices
 
 ### Do
@@ -303,8 +432,12 @@ end
 - Use counter caches for frequently accessed counts
 - Eager load associations to prevent N+1
 - Use `has_many :through` for join tables with attributes
+- Use default association values to reduce boilerplate
+- Add association extensions for domain-specific operations
+- Add self-referential methods for polymorphic uniformity
 
 ### Don't
 - Don't use `has_and_belongs_to_many` if join table needs attributes
 - Don't forget to add database indexes for foreign keys
 - Don't use callbacks for complex logic (use service objects)
+- Don't use default associations for required validations (prefer explicit)

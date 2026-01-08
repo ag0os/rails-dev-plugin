@@ -4,6 +4,98 @@ Detailed patterns for ActiveJob and Sidekiq in Rails applications.
 
 ## Job Structure
 
+### The `_later`/`_now` Convention (37signals Pattern)
+
+**Applicability**: Always applicable - this is a naming convention and architecture pattern
+
+Define both `_later` (queues job) and the synchronous method on the model. Jobs become shallow wrappers that delegate to the model.
+
+```ruby
+# Model defines both versions
+class Webhook::Delivery < ApplicationRecord
+  after_create_commit :deliver_later
+
+  # Asynchronous version - queues the job
+  def deliver_later
+    Webhook::DeliveryJob.perform_later(self)
+  end
+
+  # Synchronous version - does the actual work
+  def deliver
+    in_progress!
+    self.response = perform_request
+    completed!
+  rescue => e
+    failed!(e.message)
+  end
+
+  private
+
+  def perform_request
+    HTTP.post(webhook.url, json: payload)
+  end
+end
+
+# Job is now a shallow wrapper
+class Webhook::DeliveryJob < ApplicationJob
+  queue_as :webhooks
+
+  def perform(delivery)
+    delivery.deliver  # Just calls the model method
+  end
+end
+```
+
+**Benefits**:
+- Business logic lives in the model (testable, reusable)
+- Jobs are thin and focused on infrastructure concerns
+- Clear naming convention for async operations
+- Easy to call synchronously in tests or console
+
+### Shallow Jobs Delegating to Models (37signals Pattern)
+
+**Applicability**:
+- **Use now**: For new jobs you're creating
+- **Future direction**: For refactoring existing fat jobs
+
+Keep jobs simple - they handle queuing, retries, and error reporting. Business logic belongs in models or service objects.
+
+```ruby
+# ✅ PREFERRED: Shallow job
+class Notification::Bundle::DeliverJob < ApplicationJob
+  include SmtpDeliveryErrorHandling
+  queue_as :backend
+
+  def perform(bundle)
+    bundle.deliver  # All logic in the model
+  end
+end
+
+# Model contains the business logic
+class Notification::Bundle < ApplicationRecord
+  def deliver
+    return if delivered?
+
+    recipients.each do |recipient|
+      NotificationMailer.bundle(self, recipient).deliver_now
+    end
+
+    update!(delivered_at: Time.current)
+  end
+end
+
+# ❌ AVOID: Fat job with business logic
+class NotificationDeliverJob < ApplicationJob
+  def perform(notification)
+    user = notification.user
+    if user.email_verified?
+      NotificationMailer.deliver(notification).deliver_now
+      notification.update!(delivered_at: Time.current)
+    end
+  end
+end
+```
+
 ### Basic Job with Error Handling
 
 ```ruby
@@ -95,6 +187,69 @@ class SyncUserJob < ApplicationJob
 end
 ```
 
+## Concurrency Control
+
+**Context Awareness**: Choose the appropriate approach based on your job adapter.
+
+### Solid Queue (Built-in Concurrency Limits)
+
+**Detection**: Check if `config.active_job.queue_adapter = :solid_queue` or Solid Queue gem is present
+
+```ruby
+class Storage::MaterializeJob < ApplicationJob
+  queue_as :backend
+
+  # Limit to 1 concurrent job per owner
+  # The key lambda determines what to group by
+  limits_concurrency to: 1, key: ->(owner) { owner }
+
+  discard_on ActiveJob::DeserializationError
+
+  def perform(owner)
+    owner.materialize_storage
+  end
+end
+
+# Multiple jobs for the same owner will queue, not run concurrently
+# Jobs for different owners can run in parallel
+```
+
+**Use cases**:
+- Prevent race conditions on shared resources
+- Limit API rate limits per account
+- Control database load per tenant
+
+### Sidekiq with sidekiq-unique-jobs Gem
+
+**Detection**: Check for `sidekiq-unique-jobs` in Gemfile
+
+```ruby
+class SyncUserJob < ApplicationJob
+  # Lock until job execution completes
+  sidekiq_options lock: :until_executed,
+                  lock_args_method: ->(args) { [args.first] }
+
+  def perform(user_id)
+    UserSyncService.new(user_id).sync!
+  end
+end
+
+# Alternative: Lock while job is in queue
+class ImportJob < ApplicationJob
+  sidekiq_options lock: :until_executing,
+                  lock_args_method: ->(args) { [args.first, args.second] }
+
+  def perform(account_id, import_type)
+    ImportService.new(account_id, import_type).import!
+  end
+end
+```
+
+**Lock types**:
+- `:until_executing` - Unique while in queue, allows retries
+- `:until_executed` - Unique through completion
+- `:until_and_while_executing` - Most restrictive
+
 ## Batch Processing
 
 ### Find in Batches
@@ -159,7 +314,95 @@ class ParallelProcessJob < ApplicationJob
 end
 ```
 
+### Efficient Batch Enqueueing (Rails 7.1+)
+
+**Detection**: Check Rails version >= 7.1
+
+Use `ActiveJob.perform_all_later` to enqueue multiple jobs in a single database operation, reducing overhead.
+
+```ruby
+class Notification::Bundle
+  class << self
+    def deliver_all_later
+      # Find all bundles due for delivery
+      due.find_in_batches do |batch|
+        # Create job instances
+        jobs = batch.map { |bundle| DeliverJob.new(bundle) }
+
+        # Enqueue all at once - single DB operation
+        ActiveJob.perform_all_later(jobs)
+      end
+    end
+  end
+end
+
+# Usage in recurring job
+class DeliverNotificationBundlesJob < ApplicationJob
+  def perform
+    Notification::Bundle.deliver_all_later
+  end
+end
+```
+
+**Benefits**:
+- Reduces database round trips
+- Atomic enqueueing of related jobs
+- Better performance for bulk operations
+
 ## Scheduled Jobs
+
+### Context Awareness for Recurring Jobs
+
+**Detection**: Check for existing scheduling infrastructure:
+- `config/recurring.yml` → Solid Queue recurring jobs
+- `config/sidekiq_schedule.yml` → sidekiq-cron or sidekiq-scheduler
+- `config/schedule.rb` → whenever gem (cron-based)
+
+**If existing scheduler found**: Work within that system
+**If none exists**: Suggest based on ActiveJob adapter
+
+### Solid Queue Recurring Jobs
+
+**Detection**: Check for Solid Queue adapter and `config/recurring.yml`
+
+```yaml
+# config/recurring.yml
+production: &production
+  # Run every 30 minutes
+  deliver_bundled_notifications:
+    command: "Notification::Bundle.deliver_all_later"
+    schedule: every 30 minutes
+
+  # Cron-style scheduling
+  auto_postpone_all_due:
+    command: "Card.auto_postpone_all_due"
+    schedule: every hour at minute 50
+
+  # Job class with arguments
+  delete_unused_tags:
+    class: DeleteUnusedTagsJob
+    schedule: every day at 04:02
+
+  # With queue specification
+  weekly_report:
+    class: WeeklyReportJob
+    args: ["summary"]
+    schedule: every monday at 9am
+    queue: low
+
+development:
+  <<: *production
+
+test:
+  # Usually empty or minimal in test
+```
+
+**Schedule formats**:
+- `every 30 minutes`
+- `every hour at minute 15`
+- `every day at 2:30am`
+- `every monday at 9am`
+- `every 1st day of month at 3am`
 
 ### Recurring Job Pattern
 
@@ -290,6 +533,112 @@ class InstrumentedJob < ApplicationJob
 end
 ```
 
+## Multi-Tenant Context Serialization
+
+**Applicability**: Multi-tenant applications using `CurrentAttributes` pattern
+
+**Detection**:
+1. Check for `app/models/current.rb` with `CurrentAttributes`
+2. Check for multi-tenant architecture (e.g., `account_id` on tables)
+3. If single-tenant app: Skip this pattern
+
+**When not applicable**: Single-tenant applications don't need context serialization
+
+### Automatic Account Context (37signals Pattern)
+
+For multi-tenant apps, automatically serialize and restore the current account context across job execution:
+
+```ruby
+# config/initializers/active_job_extensions.rb
+module FizzyActiveJobExtensions
+  extend ActiveSupport::Concern
+
+  prepended do
+    attr_reader :account
+    # Ensure jobs are only enqueued after transaction commits
+    self.enqueue_after_transaction_commit = true
+  end
+
+  # Capture current account when job is enqueued
+  def initialize(...)
+    super
+    @account = Current.account
+  end
+
+  # Serialize account reference
+  def serialize
+    super.merge({ "account" => @account&.to_gid })
+  end
+
+  # Deserialize account reference
+  def deserialize(job_data)
+    super
+    if _account = job_data.fetch("account", nil)
+      @account = GlobalID::Locator.locate(_account)
+    end
+  end
+
+  # Restore account context during execution
+  def perform_now
+    if account.present?
+      Current.with_account(account) { super }
+    else
+      super
+    end
+  end
+end
+
+# Apply to all jobs
+ActiveSupport.on_load(:active_job) do
+  prepend FizzyActiveJobExtensions
+end
+```
+
+### Usage in Multi-Tenant App
+
+```ruby
+# app/models/current.rb
+class Current < ActiveSupport::CurrentAttributes
+  attribute :account, :user
+
+  def self.with_account(account)
+    set(account: account) { yield }
+  end
+end
+
+# Jobs automatically capture and restore account context
+class ProcessInvoiceJob < ApplicationJob
+  def perform(invoice)
+    # Current.account is automatically set from job initialization
+    invoice.process!
+
+    # All queries are scoped to the account
+    notifications = Notification.where(invoice: invoice)
+  end
+end
+
+# When enqueued, captures current account
+Current.set(account: @account) do
+  ProcessInvoiceJob.perform_later(invoice)
+end
+```
+
+**Benefits**:
+- No manual account passing to jobs
+- Prevents cross-tenant data leaks
+- Consistent context across async operations
+- Works with existing `Current` pattern
+
+**Detection checklist**:
+```ruby
+# Check for CurrentAttributes
+File.exist?('app/models/current.rb')
+
+# Check for multi-tenancy indicators
+grep -r "account_id" db/schema.rb
+grep -r "Current.account" app/
+```
+
 ## Queue Configuration
 
 ### Sidekiq Configuration
@@ -396,6 +745,58 @@ app/jobs/
     └── daily_report_job.rb
 ```
 
+## Context Awareness Guide
+
+When suggesting job patterns, detect the project context first:
+
+| Pattern | Detection Strategy | Conflicts | Applicability |
+|---------|-------------------|-----------|---------------|
+| **`_later`/`_now` convention** | Check existing job naming patterns | None - naming convention only | ✅ **Always applicable** |
+| **Shallow jobs** | Check existing job complexity (lines in `perform`) | Fat jobs with embedded business logic | ✅ **Use now** for new jobs<br>📋 **Future direction** for refactoring |
+| **Context serialization** | Check for `app/models/current.rb`<br>Check for `account_id` in schema<br>Check for `Current.account` usage | Single-tenant apps | ⚠️ **Multi-tenant only**<br>❌ Skip if single-tenant |
+| **`limits_concurrency`** | Check `config.active_job.queue_adapter`<br>Look for Solid Queue gem | Sidekiq (needs extension) | ✅ **Use now** if Solid Queue<br>🔧 Check adapter otherwise |
+| **Recurring jobs** | Check for `config/recurring.yml`<br>Check for `sidekiq-cron`/`sidekiq-scheduler`<br>Check for `config/schedule.rb` (whenever) | Existing scheduler choice | 🎯 **Respect existing choice**<br>Suggest based on adapter if none |
+| **Batch enqueueing** | Check Rails version in `Gemfile.lock` | Rails < 7.1 | ✅ Rails 7.1+<br>❌ Use `.each` for older versions |
+
+### Detection Commands
+
+```ruby
+# Check job adapter
+# config/application.rb or config/environments/production.rb
+grep -r "config.active_job.queue_adapter" config/
+
+# Check for multi-tenancy
+File.exist?('app/models/current.rb')
+grep -r "account_id" db/schema.rb
+
+# Check for existing schedulers
+File.exist?('config/recurring.yml')        # Solid Queue
+File.exist?('config/sidekiq_schedule.yml') # sidekiq-cron
+File.exist?('config/schedule.rb')          # whenever
+
+# Check Rails version
+grep "^  rails " Gemfile.lock
+
+# Check for unique jobs gem
+grep "sidekiq-unique-jobs" Gemfile
+```
+
+### Context-Aware Recommendations
+
+**When analyzing a project**:
+1. Run detection checks first
+2. Suggest patterns that match the existing infrastructure
+3. Note patterns that would require additional setup
+4. Flag patterns that don't apply to this architecture
+
+**Example**:
+```
+✅ Solid Queue detected → Suggest `limits_concurrency`
+⚠️ No multi-tenancy detected → Skip context serialization pattern
+✅ Rails 7.1+ → Suggest `perform_all_later` for batch enqueueing
+📋 Fat jobs detected → Suggest shallow job refactoring as future improvement
+```
+
 ## Best Practices Summary
 
 ### Do
@@ -405,6 +806,9 @@ app/jobs/
 - Handle errors explicitly
 - Log job execution
 - Test thoroughly
+- Use `_later`/`_now` naming convention
+- Keep jobs shallow, logic in models
+- Detect project context before suggesting patterns
 
 ### Don't
 - Store state in instance variables
@@ -412,3 +816,5 @@ app/jobs/
 - Create jobs with large payloads
 - Ignore failed jobs
 - Skip idempotency guards
+- Suggest multi-tenant patterns to single-tenant apps
+- Recommend Solid Queue features to Sidekiq projects

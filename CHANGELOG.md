@@ -7,13 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-- Added missing `marketplace.json` file for proper marketplace installation
-
 ### Planned
 - Video tutorials for agent usage
 - Integration with popular Rails gems
 - Example test project with sample code
+
+## [1.3.0] - 2026-01-06
+
+### Added
+
+#### New Skill: Ruby Object Design Expert
+- **`ruby-object-design` Skill** - Autonomous guidance for Ruby object-oriented design decisions
+  - Main `SKILL.md` with comprehensive decision framework
+  - `class-vs-module.md` - When to use class vs module with concrete examples
+  - `data-structures.md` - Patterns for Struct, Data (Ruby 3.2+), OpenStruct, and Hash
+- Core principle from Dave Thomas's "Rubyist's Mandate": Ruby is object-oriented, not class-oriented
+- Decision tree for choosing the right construct (class, module, Struct, Data, Hash)
+- Automatic Ruby version detection for Data class recommendations
+
+#### Context-Aware Pattern System
+All enhanced skills now feature automatic project detection:
+- **Gem Detection** - Automatically detects Pundit, CanCanCan, Devise, Sidekiq, Solid Queue, etc.
+- **Ruby Version Detection** - Adapts patterns for Ruby 3.2+ (Data class) vs earlier versions
+- **Rails Version Detection** - Uses `params.expect` (7.1+) vs `params.require.permit`
+- **Turbo Version Detection** - Applies morphing patterns (8.0+) with fallbacks
+- **Multi-tenant Detection** - Enables CurrentAttributes patterns when detected
+- **SPA Detection** - Adjusts Hotwire patterns when React/Vue/Angular detected
+
+#### Enhanced Rails Controller Patterns
+- **Resource-based Controllers** - 37signals-style single-resource controllers pattern
+- **Layered Controller Concerns** - Composable authentication, authorization, and pagination
+- **Model-based Authorization** - Context-aware (respects existing Pundit/CanCanCan)
+- **`params.expect` Pattern** - Rails 7.1+ with automatic fallback for earlier versions
+- Context awareness reference section documenting all detection points
+
+#### Enhanced Rails Jobs Patterns
+- **`_later`/`_now` Naming Convention** - Clear async vs sync method naming
+- **Shallow Jobs Pattern** - Jobs that delegate to model methods (37signals style)
+- **Automatic Context Serialization** - Multi-tenant CurrentAttributes preservation
+- **Concurrency Control** - Solid Queue and Sidekiq-specific patterns
+- **Recurring Jobs Configuration** - Cron-style job scheduling patterns
+- **Batch Job Enqueueing** - Efficient bulk job creation patterns
+
+#### Enhanced Hotwire Patterns
+- **Turbo Morphing** - Turbo 8.0+ page refresh with morph method
+- **Permanent Elements** - Preserving state during morphs (`data-turbo-permanent`)
+- **Fragment Caching with Turbo** - Cache-aware Turbo Stream responses
+- **Auto-save Controller** - Stimulus controller with debounced form submission
+- **JavaScript Helpers** - `debounce`, `nextFrame`, `waitForElement` utilities
+- Context awareness for Hotwire vs SPA detection
+
+#### Enhanced Rails Model Patterns
+- **Default Association Values** - Context-aware for CurrentAttributes/multi-tenant
+- **Association Extensions** - Custom methods on associations
+- **Self-referential Convenience Methods** - Cleaner model APIs
+- **New `value-objects.md`** - Comprehensive Struct/Data patterns with Ruby version detection
+
+### Changed
+- All enhanced skills now include "Context Awareness" reference sections
+- Patterns provide automatic fallbacks for version-dependent features
+- Conflict detection warns when multiple solutions exist (e.g., Pundit + CanCanCan)
+- Skills detect project conventions before suggesting patterns
+
+### Technical Details
+- Integrated patterns from Dave Thomas's "The Rubyist's Mandate"
+- Incorporated 37signals Fizzy Architecture production patterns
+- All version-dependent patterns include detection instructions
+- Fallback patterns provided for older Rails/Ruby/Turbo versions
+
+### Migration Notes
+For users upgrading from 1.2.0:
+- No breaking changes - all existing functionality preserved
+- New `ruby-object-design` Skill activates automatically on relevant queries
+- Enhanced skills provide smarter, context-aware recommendations
+- Detection is automatic - no configuration required
 
 ## [1.2.0] - 2025-10-27
 
@@ -117,7 +184,8 @@ For users upgrading from 1.1.0:
 - **Fixed** - Bug fixes
 - **Security** - Security improvements
 
-[Unreleased]: https://github.com/ag0os/rails-dev-plugin/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/ag0os/rails-dev-plugin/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/ag0os/rails-dev-plugin/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/ag0os/rails-dev-plugin/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/ag0os/rails-dev-plugin/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/ag0os/rails-dev-plugin/releases/tag/v1.0.0
