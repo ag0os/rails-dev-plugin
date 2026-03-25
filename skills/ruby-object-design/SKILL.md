@@ -1,6 +1,6 @@
 ---
-name: Ruby Object Design Expert
-description: Automatically invoked when making decisions about Ruby code structure and organization. Triggers on mentions of "class or module", "should this be a class", "struct vs class", "PORO", "data object", "design pattern", "class vs module", "when to use class", "module vs class", "stateless class", "value object", "data container", "object factory", "extend self", "singleton class". Provides guidance on choosing the right Ruby construct (class, module, Struct, Data, Hash) based on the principle that Ruby is object-oriented, not class-oriented.
+name: ruby-object-design
+description: Automatically invoked when making decisions about Ruby code structure and organization. Triggers on "class or module", "should this be a class", "struct vs class", "PORO", "data object", "design pattern", "class vs module", "when to use class", "module vs class", "stateless class", "value object", "data container", "object factory", "extend self", "singleton class". Provides guidance on choosing the right Ruby construct (class, module, Struct, Data, Hash). NOT for code smell identification or refactoring (use ruby-refactoring) or Rails-specific framework patterns.
 allowed-tools: Read, Grep, Glob
 ---
 

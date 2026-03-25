@@ -1,6 +1,6 @@
 ---
-name: Ruby Refactoring Expert
-description: Automatically invoked when analyzing code quality, refactoring, or maintainability. Triggers on mentions of "code smell", "refactor", "code quality", "technical debt", "complexity", "maintainability", "clean code", "SOLID", "DRY", "improve code", "simplify", "extract method", "extract class", "long method", "large class", "duplication". Provides Ruby refactoring patterns and code smell identification based on Ruby Science methodology for recently written Ruby/Rails code.
+name: ruby-refactoring
+description: Automatically invoked when analyzing code quality, refactoring, or maintainability. Triggers on "code smell", "refactor", "code quality", "technical debt", "complexity", "maintainability", "clean code", "SOLID", "DRY", "improve code", "simplify", "extract method", "extract class", "long method", "large class", "duplication". Provides Ruby refactoring patterns and code smell identification based on Ruby Science methodology. NOT for object design decisions (use ruby-object-design) or Rails-specific framework patterns.
 allowed-tools: Read, Grep, Glob
 ---
 
@@ -326,7 +326,6 @@ Before finalizing recommendations:
 
 - [code-smells.md](code-smells.md) - Complete code smell catalog
 - [refactoring-patterns.md](refactoring-patterns.md) - Detailed refactoring patterns
-- [testing-patterns.md](testing-patterns.md) - Testing best practices
 
 ## Quick Decision Matrix
 

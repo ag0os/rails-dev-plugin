@@ -4,50 +4,75 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Claude Code plugin that provides 10 specialized agents and 1 autonomous Skill for Rails application development. The plugin is distributed via Claude Code's plugin marketplace and installed into Rails projects.
+This is a Claude Code plugin that provides 11 specialized agents and 13 portable skills for Rails application development. Agents are lean orchestrators that load domain-specific skills via the `skills` frontmatter field. Skills are independently usable and exportable to other platforms.
 
 ## Repository Structure
 
 ```
 rails-dev-plugin/
 ├── .claude-plugin/
-│   └── plugin.json          # Plugin metadata (name, version, description)
-├── agents/                   # 10 specialized agents (markdown files)
-│   ├── rails-model.md
-│   ├── rails-controller.md
-│   ├── rails-views.md
-│   ├── rails-service.md
-│   ├── rails-jobs.md
-│   ├── rails-test.md
-│   ├── rails-stimulus-turbo.md
-│   ├── rails-graphql.md
-│   ├── rails-architect.md
-│   └── rails-devops.md
-└── skills/                   # 1 autonomous Skill
-    └── ruby-refactoring/
-        ├── SKILL.md
-        ├── code-smells.md
-        └── refactoring-patterns.md
+│   └── plugin.json                     # Plugin metadata (name, version, description)
+├── agents/                              # 11 lean agents (reference skills for knowledge)
+│   ├── rails-model.md                   # skills: [rails-model-patterns]
+│   ├── rails-controller.md              # skills: [rails-controller-patterns]
+│   ├── rails-views.md                   # skills: [rails-views-patterns]
+│   ├── rails-service.md                 # skills: [rails-service-patterns]
+│   ├── rails-jobs.md                    # skills: [rails-jobs-patterns]
+│   ├── rails-test.md                    # skills: [rails-testing-patterns]
+│   ├── rails-hotwire.md                 # skills: [hotwire-patterns]
+│   ├── rails-graphql.md                 # skills: [rails-graphql-patterns]
+│   ├── rails-architect.md               # skills: [rails-architecture-patterns]
+│   ├── rails-devops.md                  # skills: [rails-devops-patterns]
+│   └── rails-api.md                     # skills: [rails-api-patterns, rails-controller-patterns]
+└── skills/                              # 13 portable skills (domain knowledge)
+    ├── rails-model-patterns/            # ActiveRecord, associations, migrations
+    ├── rails-controller-patterns/       # RESTful controllers, routing, params
+    ├── rails-views-patterns/            # ERB, partials, helpers, caching
+    ├── rails-service-patterns/          # Service objects, result pattern, DI
+    ├── rails-jobs-patterns/             # ActiveJob, Sidekiq, idempotency
+    ├── rails-testing-patterns/          # RSpec, Minitest, system tests
+    ├── hotwire-patterns/                # Stimulus, Turbo frames/streams
+    ├── rails-graphql-patterns/          # Schema, mutations, DataLoader
+    ├── rails-architecture-patterns/     # Planning, design decisions, skill directory
+    ├── rails-devops-patterns/           # Docker, CI/CD, monitoring, security
+    ├── rails-api-patterns/              # API controllers, serialization, JWT
+    ├── ruby-refactoring/                # Code smells, refactoring patterns
+    └── ruby-object-design/              # Class vs module, Struct, Data
 ```
 
 ## Architecture
 
-### Agent System
-Each agent is a standalone markdown file with YAML frontmatter that defines:
-- `name`: Agent identifier used by Claude Code
-- `description`: When Claude should invoke this agent (contains examples)
-- `model`: Which Claude model to use (typically "sonnet")
-- `color`: UI color for the agent
+### Key Design Principle
 
-The description field is critical - it contains trigger patterns and examples that teach Claude Code when to invoke each agent. These examples use a specific format with `<example>`, `<commentary>`, and context markers.
+**Skills = portable domain knowledge. Agents = lean execution orchestrators.**
+
+Agents use the `skills` frontmatter field to preload skill content at startup. This means:
+- All domain knowledge (patterns, code examples, best practices) lives in skills
+- Agent bodies contain only: role identity, execution workflow, completion checklist
+- Skills work independently (invoked in main conversation) AND as agent knowledge
+- Skills are exportable to other platforms without modification
+
+### Agent System
+
+Each agent is a lean markdown file with YAML frontmatter:
+- `name`: Agent identifier
+- `description`: Trigger patterns with `<example>` blocks
+- `model`: "sonnet" for all agents
+- `color`: UI distinction
+- `tools`: Tool access (Read, Write, Edit, Grep, Glob, Bash, etc.)
+- `skills`: List of skill names to preload as domain knowledge
+
+**Agent bodies do NOT contain code examples** — those are in skills.
 
 ### Skills System
-Skills are autonomous capabilities that Claude invokes automatically based on task context. Unlike agents (which are explicitly called), Skills are:
-- Invoked proactively by Claude based on the `description` field
-- Limited to specific tools via `allowed-tools` directive
-- Organized in directories with supporting documentation files
 
-**Ruby Refactoring Expert Skill**: Analyzes code quality, identifies smells, suggests refactoring patterns
+Each skill is a directory with SKILL.md and supporting docs:
+- `name`: kebab-case identifier (must match what agents reference)
+- `description`: WHAT + WHEN triggers + NOT FOR negative triggers (≤1024 chars)
+- `allowed-tools`: Read, Grep, Glob (for independent invocation)
+- SKILL.md ≤ 200 lines; detailed content in supporting `.md` files
+
+Two skills (`ruby-refactoring`, `ruby-object-design`) are independent — not tied to any agent.
 
 ## Development Workflow
 
@@ -59,12 +84,13 @@ Skills are autonomous capabilities that Claude invokes automatically based on ta
    cd /path/to/test-rails-project
    claude
    ```
-   ```shell
+   ```
    /plugin marketplace add /path/to/rails-dev-plugin
    /plugin install rails-dev-plugin@local
    ```
-3. Test the agent by triggering it with relevant prompts
-4. Restart Claude Code if changes don't appear
+3. Test agent delegation triggers correctly
+4. Test skills work independently in main conversation
+5. Restart Claude Code if changes don't appear
 
 ### Version Management
 
@@ -74,65 +100,32 @@ Skills are autonomous capabilities that Claude invokes automatically based on ta
 
 ### Agent Development Guidelines
 
-**Frontmatter Requirements:**
-- Include clear, specific examples in the `description` field
-- Examples should show user prompts and expected agent invocation
-- Use `<commentary>` blocks to explain why the agent should be used
+- Keep agents lean — execution workflow and checklist only
+- NO code examples in agent bodies (put them in skills)
+- Include `<example>` blocks in `description` for trigger patterns
+- Reference skills via the `skills` frontmatter field
+- Start body with "You are a [role] specialist..."
 
-**Content Structure:**
-- Start with "You are a [role] expert..." to establish agent identity
-- Include "Core Responsibilities" section
-- Provide concrete best practices and guidelines
-- Add code examples where helpful
-- Reference relevant directories (app/models, app/controllers, etc.)
+### Skill Development Guidelines
 
-**Key Principles:**
-- Keep agents focused on specific domains
-- Provide actionable, step-by-step guidance
-- Include Rails/Ruby best practices
-- Consider project conventions (Jumpstart Pro, ViewComponent, etc.)
-
-### Skills Development Guidelines
-
-**Frontmatter for Skills:**
-- `name`: Descriptive skill name
-- `description`: When Claude should invoke (must be comprehensive)
-- `allowed-tools`: Restrict to Read, Grep, Glob for analysis tasks
-
-**Directory Structure:**
-- Main `SKILL.md` contains core skill logic
-- Supporting `.md` files provide reference material
-- Skills can reference other files in their directory
-
-## Plugin Distribution
-
-This plugin is designed to be installed via:
-1. GitHub marketplace: `/plugin marketplace add user/rails-dev-plugin`
-2. Local development: `/plugin marketplace add /path/to/rails-dev-plugin`
-3. Team auto-install: Add to project's `.claude/settings.json`
+- `name` MUST be kebab-case (no spaces, no capitals)
+- `description` must include WHAT + WHEN + negative triggers
+- SKILL.md ≤ 200 lines; use supporting docs for detail
+- Include: quick reference table, core principles, code examples, anti-patterns, output format
+- Supporting docs go in the same directory (not in subdirectories)
 
 ## Key Conventions
 
-- All agent files use `.md` extension with YAML frontmatter
-- Plugin metadata lives in `.claude-plugin/plugin.json`
-- Version numbers follow semantic versioning
-- CHANGELOG.md tracks all changes
-- Agent colors: Use for visual distinction in Claude Code UI
-- Model selection: "sonnet" for most agents (balance of speed/capability)
-
-## Testing Considerations
-
-When modifying agents:
-- Test in a real Rails project, not just this repository
-- Verify the `description` triggers correctly
-- Check for conflicts with other agents
-- Test both explicit requests ("use rails-model agent") and implicit triggers
-- Ensure examples in agent content actually work
+- All files use `.md` extension with YAML frontmatter
+- Plugin metadata in `.claude-plugin/plugin.json`
+- Semantic versioning
+- Agent colors: distinct per agent for UI clarity
+- Model: "sonnet" for all agents
 
 ## Important Notes
 
 - This is a **plugin repository**, not a Rails application
-- No Ruby/Rails code runs here - agents provide guidance for other projects
-- The markdown files define agent behavior and knowledge
+- No Ruby/Rails code runs here — agents and skills provide guidance for other projects
+- The `skills` field in agent frontmatter causes skill content to be injected into the agent's context at startup
+- Plugin agents do NOT support `hooks`, `mcpServers`, or `permissionMode` fields
 - Changes to `.claude-plugin/plugin.json` require plugin reinstallation
-- Changes to agent markdown files may require Claude Code restart
