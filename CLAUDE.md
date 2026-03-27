@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Claude Code plugin that provides 11 specialized agents and 13 portable skills for Rails application development. Agents are lean orchestrators that load domain-specific skills via the `skills` frontmatter field. Skills are independently usable and exportable to other platforms.
+This is a Claude Code plugin that provides 11 specialized agents and 14 portable skills for Rails application development. Agents are lean orchestrators that load domain-specific skills via the `skills` frontmatter field. Skills are independently usable and exportable to other platforms.
 
 ## Repository Structure
 
@@ -36,6 +36,7 @@ rails-dev-plugin/
     ├── rails-architecture-patterns/     # Planning, design decisions, skill directory
     ├── rails-devops-patterns/           # Docker, CI/CD, monitoring, security
     ├── rails-api-patterns/              # API controllers, serialization, JWT
+    ├── rails-stack-profiles/            # Stack profile detection (omakase, service-oriented, api-first)
     ├── ruby-refactoring/                # Code smells, refactoring patterns
     └── ruby-object-design/              # Class vs module, Struct, Data
 ```
@@ -51,6 +52,12 @@ Agents use the `skills` frontmatter field to preload skill content at startup. T
 - Agent bodies contain only: role identity, execution workflow, completion checklist
 - Skills work independently (invoked in main conversation) AND as agent knowledge
 - Skills are exportable to other platforms without modification
+
+### Stack Profiles
+
+The plugin supports three Rails stack profiles: **omakase**, **service-oriented**, and **api-first** (plus hybrids). The `rails-stack-profiles` skill defines detection logic and per-profile recommendations. The architect agent detects the profile as Step 0 before making any recommendations.
+
+Other skills and agents should present profile-appropriate patterns when the decision differs by profile (e.g., "extract to concern" for omakase vs "extract to service object" for service-oriented). See `skills/rails-stack-profiles/` for details.
 
 ### Agent System
 
@@ -72,7 +79,9 @@ Each skill is a directory with SKILL.md and supporting docs:
 - `allowed-tools`: Read, Grep, Glob (for independent invocation)
 - SKILL.md ≤ 200 lines; detailed content in supporting `.md` files
 
-Two skills (`ruby-refactoring`, `ruby-object-design`) are independent — not tied to any agent.
+Three skills are independent — not tied to any single agent:
+- `ruby-refactoring` and `ruby-object-design` (standalone code quality skills)
+- `rails-stack-profiles` (loaded by the architect agent, but also usable independently for profile detection)
 
 ## Development Workflow
 
@@ -113,6 +122,7 @@ Two skills (`ruby-refactoring`, `ruby-object-design`) are independent — not ti
 - SKILL.md ≤ 200 lines; use supporting docs for detail
 - Include: quick reference table, core principles, code examples, anti-patterns, output format
 - Supporting docs go in the same directory (not in subdirectories)
+- **Profile-awareness:** When a skill covers a decision that differs by profile (e.g., where business logic goes, which testing framework to use), present the profile-appropriate pattern. Use the format: "**Omakase:** do X / **Service-oriented:** do Y" rather than presenting one approach as universal. Reference `rails-stack-profiles` for detection logic.
 
 ## Key Conventions
 

@@ -55,9 +55,11 @@ end
 
 ### Service Object vs Concern vs Plain Model Method
 
+**The right answer depends on the project's stack profile.** See `rails-stack-profiles` for detection.
+
 **Plain Model Method**
 
-Use for logic that operates on a single record's own data:
+Use for logic that operates on a single record's own data (all profiles):
 
 ```ruby
 class Order < ApplicationRecord
@@ -69,7 +71,7 @@ end
 
 **Concern**
 
-Use to share capabilities across multiple models:
+Use to share capabilities across multiple models. **Omakase profile:** concerns are also the primary way to decompose large models and encapsulate domain logic.
 
 ```ruby
 # app/models/concerns/searchable.rb
@@ -84,9 +86,34 @@ module Searchable
 end
 ```
 
+**Omakase pattern — concern for domain logic (not just shared behavior):**
+
+```ruby
+# app/models/concerns/purchasable.rb
+module Purchasable
+  extend ActiveSupport::Concern
+
+  included do
+    has_many :payments, as: :purchasable
+    after_create :send_confirmation
+  end
+
+  def charge!
+    PaymentGateway.charge(total, user.payment_method)
+    update!(paid_at: Time.current)
+  end
+
+  private
+
+  def send_confirmation
+    OrderMailer.confirmation(self).deliver_later
+  end
+end
+```
+
 **Service Object**
 
-Use for multi-step workflows that coordinate multiple models/external services:
+Use for multi-step workflows that coordinate multiple models/external services. **Service-oriented and api-first profiles:** this is the default extraction pattern. **Omakase profile:** use only when a workflow genuinely spans multiple unrelated models or external systems.
 
 ```ruby
 # app/services/checkout_service.rb
@@ -111,14 +138,15 @@ end
 
 **Decision matrix:**
 
-| Scenario | Use |
-|----------|-----|
-| Calculates from own attributes | Model method |
-| Shared behavior across 2+ models | Concern |
-| Coordinates multiple models | Service object |
-| Calls external API | Service object |
-| Multi-step with rollback | Service object + transaction |
-| Adds a scope or callback | Concern |
+| Scenario | Omakase | Service-Oriented |
+|----------|---------|-----------------|
+| Calculates from own attributes | Model method | Model method |
+| Shared behavior across 2+ models | Concern | Concern |
+| Domain logic for one model | Concern or model method | Service object |
+| Coordinates multiple models | Concern with callbacks, or model method | Service object |
+| Calls external API | Model method wrapping client | Service object |
+| Multi-step with rollback | Model method + transaction | Service object + transaction |
+| Simple side effect (email, log) | Callback | Service object |
 
 ### Monolith vs Engine vs Microservice
 
@@ -217,7 +245,9 @@ end
 
 **Symptom:** Controller actions > 15 lines, business logic in controller.
 
-**Fix:** Move logic to service objects, keep controller as router.
+**Fix depends on profile:**
+
+**Omakase fix — move logic to the model:**
 
 ```ruby
 # Before
@@ -234,7 +264,21 @@ def create
   end
 end
 
-# After
+# After (omakase) — model handles its own workflow
+def create
+  @order = current_user.orders.build(order_params)
+  if @order.place!  # Model method handles tax, discount, payment, email
+    redirect_to @order
+  else
+    render :new, status: :unprocessable_entity
+  end
+end
+```
+
+**Service-oriented fix — extract to service object:**
+
+```ruby
+# After (service-oriented) — service orchestrates the workflow
 def create
   result = CreateOrderService.call(params: order_params, user: current_user)
   if result.success?
@@ -250,10 +294,12 @@ end
 
 **Symptom:** Long chains of `after_create`, `before_save` callbacks that trigger side effects.
 
-**Fix:** Use service objects for workflows; keep callbacks for data integrity only.
+**Fix depends on profile:**
+
+**Omakase fix — reduce to essential callbacks, use explicit model methods for workflows:**
 
 ```ruby
-# Bad: Callbacks with side effects
+# Bad: Too many implicit callbacks
 class Order < ApplicationRecord
   after_create :charge_payment
   after_create :send_confirmation_email
@@ -261,7 +307,25 @@ class Order < ApplicationRecord
   after_create :notify_warehouse
 end
 
-# Good: Callbacks only for data integrity
+# Good (omakase): Callbacks for data integrity; explicit method for workflow
+class Order < ApplicationRecord
+  before_validation :normalize_status
+  after_create_commit :send_confirmation_email  # Simple, expected side effect
+
+  def place!
+    transaction do
+      save!
+      charge_payment
+      reserve_inventory
+    end
+  end
+end
+```
+
+**Service-oriented fix — extract to service object:**
+
+```ruby
+# Good (service-oriented): Callbacks only for data integrity
 class Order < ApplicationRecord
   before_validation :normalize_status
   after_create :set_order_number  # Pure data concern
@@ -287,11 +351,40 @@ end
 - Then make it right (refactor)
 - Then make it fast (optimize with data)
 
-### Missing Service Layer
+### Missing Abstraction Layer
 
 **Symptom:** Controllers orchestrate complex multi-model operations directly.
 
-**Fix:** Introduce service objects at the right granularity:
+**Fix depends on profile:**
+
+**Omakase fix — enrich models with domain methods and concerns:**
+
+```ruby
+# app/models/order.rb
+class Order < ApplicationRecord
+  include Purchasable    # Payment logic
+  include Fulfillable    # Inventory + shipping logic
+
+  def place!
+    transaction do
+      save!
+      charge!
+      reserve_inventory!
+      OrderMailer.confirmation(self).deliver_later
+    end
+  end
+
+  def cancel!
+    transaction do
+      refund!
+      release_inventory!
+      update!(status: "cancelled")
+    end
+  end
+end
+```
+
+**Service-oriented fix — introduce service objects at the right granularity:**
 
 ```
 app/services/

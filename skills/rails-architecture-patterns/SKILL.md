@@ -27,6 +27,18 @@ See [patterns.md](patterns.md) for detailed decision frameworks and anti-pattern
 | Refactoring | ruby-refactoring | (skill only) | Code smells, refactoring patterns, Ruby Science |
 | Object Design | ruby-object-design | (skill only) | Class vs module, Struct, Data, design decisions |
 
+## Stack Profile Awareness
+
+**Before recommending patterns, determine the project's stack profile.** See `rails-stack-profiles` for detection logic. The profile determines which patterns are appropriate:
+
+| Decision | Omakase | Service-Oriented | API-First |
+|----------|---------|-----------------|-----------|
+| Business logic home | Models + concerns | Service objects | Service/command objects |
+| Fat controller fix | Extract to concern/model | Extract to service | Extract to service |
+| Testing | Minitest + fixtures | RSpec + FactoryBot | RSpec + FactoryBot |
+| Auth | `has_secure_password` | Devise | JWT/token |
+| Job backend | Solid Queue | Sidekiq | Sidekiq or Solid Queue |
+
 ## Core Design Principles
 
 | Principle | Meaning | Rails Example |
@@ -34,8 +46,8 @@ See [patterns.md](patterns.md) for detailed decision frameworks and anti-pattern
 | **CoC** | Convention over Configuration | Follow Rails naming, directory structure |
 | **DRY** | Don't Repeat Yourself | Extract concerns, shared partials, service objects |
 | **RESTful** | Resource-oriented routes | 7 standard actions per controller |
-| **Fat Model, Skinny Controller** | Business logic in models/services | Controllers only route + render |
-| **Least Surprise** | Code does what reader expects | Follow community conventions |
+| **Fat Model, Skinny Controller** | Business logic in models (omakase) or services (service-oriented) | Controllers only route + render |
+| **Least Surprise** | Code does what reader expects | Follow the project's own conventions |
 | **YAGNI** | Don't build what you don't need | Avoid premature abstraction |
 
 ## Planning Framework
@@ -54,11 +66,12 @@ When receiving a feature request:
 | Question | Option A | Option B | Choose A when | Choose B when |
 |----------|----------|----------|---------------|---------------|
 | Inheritance | STI | Polymorphic | Shared behavior + same columns | Different attributes per type |
-| Shared logic | Concern | Service Object | Adds model capability | Orchestrates a workflow |
+| Shared logic | Concern | Service Object | Omakase profile, or adds model capability | Service-oriented profile, or orchestrates a workflow |
 | Background work | ActiveJob | Inline | > 100ms or external call | Fast + must be synchronous |
+| Job backend | Solid Queue | Sidekiq | Omakase profile, simple needs | Service-oriented/api-first, Redis already in stack |
 | API format | JSON:API | Custom JSON | Public API, many clients | Internal API, simple needs |
 | Frontend | Hotwire | SPA (React) | Content-heavy, progressive | Complex interactive UI |
-| Auth | Devise | Custom | Standard auth needs | Highly custom flow |
+| Auth | `has_secure_password` | Devise | Omakase profile, simple needs | Service-oriented, standard multi-feature auth |
 
 ## Implementation Order
 
@@ -75,16 +88,32 @@ For a typical feature (e.g., "add product reviews"):
 
 ## Architecture Health Checks
 
-When reviewing an existing codebase, check:
+When reviewing an existing codebase, check (adapt to detected profile):
 
+**Universal (all profiles):**
 - [ ] No business logic in controllers or views
-- [ ] Models under 200 lines (extract concerns/services if larger)
 - [ ] Controllers have 7 or fewer actions
 - [ ] No N+1 queries (check with Bullet gem)
 - [ ] Background jobs are idempotent
-- [ ] All external API calls go through service objects
 - [ ] Test coverage on critical paths
 - [ ] No circular dependencies between models
+
+**Omakase profile:**
+- [ ] Models decomposed via concerns (not monolithic god models)
+- [ ] Callbacks are simple and predictable (data integrity, not workflows)
+- [ ] Using Rails defaults (Solid Queue, etc.) where possible
+
+**Service-oriented profile:**
+- [ ] Models under 200 lines (extract services if larger)
+- [ ] All external API calls go through service objects
+- [ ] Service objects have single responsibility
+- [ ] Result pattern used consistently
+
+**API-first profile:**
+- [ ] All responses use serializers (never raw ActiveRecord)
+- [ ] API versioned from day one
+- [ ] Authentication is token-based
+- [ ] Error responses follow consistent envelope format
 
 ## Output Format
 
