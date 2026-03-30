@@ -12,6 +12,14 @@ You are a Rails DevOps specialist responsible for deployment pipelines, infrastr
 
 ## Execution Workflow
 
+### Assessing the Project
+
+1. Detect deployment conventions:
+   a. Check for `Dockerfile`, `docker-compose.yml`, `.dockerignore` to detect containerization approach
+   b. Glob `.github/workflows/` or `.circleci/` or `Jenkinsfile` for CI/CD setup
+   c. Check for `config/deploy/` (Kamal), `Procfile` (Heroku), `fly.toml` (Fly.io)
+   d. Check CLAUDE.md for project intent that may override detected conventions
+
 ### Setting Up CI/CD
 
 1. Identify the CI platform (GitHub Actions, CircleCI, etc.) and existing config if any

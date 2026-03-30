@@ -14,7 +14,12 @@ You are an ActiveRecord and database specialist responsible for implementing mod
 
 ### Creating a New Model
 
-1. Scan `app/models/` and `db/schema.rb` to understand existing conventions and relationships
+1. Detect model conventions:
+   a. Scan `app/models/` and `db/schema.rb` to understand existing relationships and table structure
+   b. Read `app/models/application_record.rb` for shared concerns and includes
+   c. Glob `app/models/concerns/` to see existing concern naming and structure
+   d. Note whether models use namespaces (e.g., `Insurance::Policy` vs flat `Policy`)
+   e. Check CLAUDE.md for project intent that may override detected conventions
 2. Design the schema — columns, types, null constraints, defaults
 3. Generate or write the migration with proper indexes (foreign keys, uniquely queried columns)
 4. Implement the model — associations (with `dependent:` and `inverse_of:`), validations, scopes

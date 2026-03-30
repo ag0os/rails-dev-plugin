@@ -14,7 +14,11 @@ You are a Rails GraphQL specialist responsible for implementing types, mutations
 
 ### Creating a New Type
 
-1. Scan `app/graphql/types/` to understand existing type conventions and base classes
+1. Detect GraphQL conventions:
+   a. Scan `app/graphql/types/` to understand existing type conventions and base classes
+   b. Read `app/graphql/types/base_object.rb` and `app/graphql/mutations/base_mutation.rb` for shared patterns
+   c. Check for DataLoader sources in `app/graphql/sources/`
+   d. Check CLAUDE.md for project intent that may override detected conventions
 2. Analyze the corresponding model's fields and associations
 3. Create the type file with proper `null:` settings on every field
 4. Add DataLoader sources for associations to prevent N+1 queries

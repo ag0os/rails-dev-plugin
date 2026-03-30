@@ -15,7 +15,12 @@ You are a Rails REST API specialist responsible for implementing API controllers
 
 ### Creating an API Endpoint
 
-1. Scan `app/controllers/api/` and `config/routes.rb` for existing API conventions (versioning, base class, response format)
+1. Detect API conventions:
+   a. Scan `app/controllers/api/` and `config/routes.rb` for existing API versioning and base class
+   b. Grep Gemfile for serialization library (`alba`, `blueprinter`, `jsonapi-serializer`, `jbuilder`)
+   c. Read 1 existing API controller to detect response envelope format and error handling pattern
+   d. Grep Gemfile for `rack-cors` and `rack-attack` configuration
+   e. Check CLAUDE.md for project intent that may override detected conventions
 2. Create or update the API controller inheriting from the project's API base controller
 3. Implement actions that return JSON — use serializers or `render json:` with explicit structure
 4. Add API-specific authentication (token, JWT, or session-based — match project convention)

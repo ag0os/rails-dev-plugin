@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Claude Code plugin that provides 11 specialized agents and 17 portable skills for Rails application development. Agents are lean orchestrators that load domain-specific skills via the `skills` frontmatter field. Skills are independently usable and exportable to other platforms.
+This is a Claude Code plugin that provides 11 specialized agents and 18 portable skills for Rails application development. Agents are lean orchestrators that load domain-specific skills via the `skills` frontmatter field. Skills are independently usable and exportable to other platforms.
 
 ## Repository Structure
 
@@ -24,7 +24,7 @@ rails-dev-plugin/
 │   ├── rails-architect.md               # skills: [rails-architecture-patterns]
 │   ├── rails-devops.md                  # skills: [rails-devops-patterns]
 │   └── rails-api.md                     # skills: [rails-api-patterns, rails-controller-patterns]
-└── skills/                              # 17 portable skills (domain knowledge)
+└── skills/                              # 18 portable skills (domain knowledge)
     ├── rails-model-patterns/            # ActiveRecord, associations, migrations
     ├── rails-controller-patterns/       # RESTful controllers, routing, params
     ├── rails-views-patterns/            # ERB, partials, helpers, caching
@@ -41,7 +41,8 @@ rails-dev-plugin/
     ├── rails-auth-patterns/             # Authentication (built-in vs Devise)
     ├── rails-caching-patterns/          # Fragment, low-level, HTTP caching
     ├── ruby-refactoring/                # Code smells, refactoring patterns
-    └── ruby-object-design/              # Class vs module, Struct, Data
+    ├── ruby-object-design/              # Class vs module, Struct, Data
+    └── project-conventions/             # Auto-detect project-specific coding conventions
 ```
 
 ## Architecture
@@ -82,9 +83,10 @@ Each skill is a directory with SKILL.md and supporting docs:
 - `allowed-tools`: Read, Grep, Glob (for independent invocation)
 - SKILL.md ≤ 200 lines; detailed content in supporting `.md` files
 
-Six skills are independent — not tied to any single agent:
+Seven skills are independent — not tied to any single agent:
 - `ruby-refactoring` and `ruby-object-design` (standalone code quality skills)
 - `rails-stack-profiles` (loaded by the architect agent, but also usable independently for profile detection)
+- `project-conventions` (loaded by the architect agent; all domain agents run lightweight micro-scans from its detection recipes)
 - `rails-mailer-patterns`, `rails-auth-patterns`, `rails-caching-patterns` (standalone domain skills)
 
 ## Development Workflow

@@ -14,7 +14,12 @@ You are a Rails controller and routing specialist responsible for implementing R
 
 ### Creating a Controller
 
-1. Scan `app/controllers/` and `config/routes.rb` to understand existing conventions
+1. Detect controller conventions:
+   a. Read `app/controllers/application_controller.rb` for includes, `rescue_from`, helper methods
+   b. Grep Gemfile for pagination gem (`pagy`, `kaminari`, `will_paginate`)
+   c. Grep Gemfile for authorization gem (`pundit`, `cancancan`, `action_policy`)
+   d. Read 1 existing controller of similar complexity to match response patterns and structure
+   e. Check CLAUDE.md for project intent that may override detected conventions
 2. Create the controller with standard RESTful actions (index, show, new, create, edit, update, destroy)
 3. Add `before_action` callbacks — authentication, authorization, resource loading
 4. Implement strong parameters with `params.expect` or `params.require().permit()`

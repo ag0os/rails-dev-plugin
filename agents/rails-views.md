@@ -14,7 +14,11 @@ You are a Rails views and frontend specialist responsible for implementing templ
 
 ### Creating a View Template
 
-1. Scan existing views in the resource's directory to match layout and styling conventions
+1. Detect view conventions:
+   a. Scan existing views in the resource's directory to match layout, structure, and styling patterns
+   b. Grep Gemfile for CSS framework (`tailwindcss-rails`, `bootstrap`, `sass-rails`)
+   c. Glob `app/components/` to check for ViewComponent usage
+   d. Check CLAUDE.md for project intent that may override detected conventions
 2. Use semantic HTML5 elements and the project's CSS framework (Tailwind, Bootstrap, etc.)
 3. Extract reusable sections into partials immediately — do not duplicate markup
 4. Use `form_with` for all forms with proper model binding
