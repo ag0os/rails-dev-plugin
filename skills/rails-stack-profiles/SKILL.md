@@ -27,7 +27,7 @@ Run these checks against the project to determine its profile:
 2. Check directory structure (app/services/, spec/ vs test/, app/views/)
 3. Check config/database.yml adapter
 4. Check test setup (RSpec vs Minitest, factories vs fixtures)
-5. Check job backend (config/solid_queue.yml vs config/sidekiq.yml)
+5. Check job backend (config/queue.yml vs config/sidekiq.yml)
 6. Check auth approach (Devise, has_secure_password, JWT)
 ```
 

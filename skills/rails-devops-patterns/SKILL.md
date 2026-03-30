@@ -45,11 +45,12 @@ ENV RAILS_ENV=production \
     BUNDLE_WITHOUT="development:test"
 
 FROM base AS build
-RUN apk add --no-cache build-base git nodejs yarn
+RUN apk add --no-cache build-base git
 COPY Gemfile Gemfile.lock ./
 RUN bundle install --jobs 4 --retry 3
-COPY package.json yarn.lock ./
-RUN yarn install --production --frozen-lockfile
+# Only install Node deps if package.json exists (skip for importmap apps)
+COPY package.json* yarn.lock* ./
+RUN if [ -f package.json ]; then apk add --no-cache nodejs yarn && yarn install --production --frozen-lockfile; fi
 COPY . .
 RUN SECRET_KEY_BASE=precompile_placeholder bundle exec rails assets:precompile
 
@@ -102,7 +103,7 @@ config.log_level = ENV.fetch("LOG_LEVEL", "info").to_sym
 config.force_ssl = true
 config.ssl_options = {
   hsts: { subdomains: true, preload: true, expires: 1.year },
-  redirect: { exclude: ->(request) { request.path.start_with?("/health") } }
+  redirect: { exclude: ->(request) { request.path.start_with?("/health", "/up") } }
 }
 ```
 

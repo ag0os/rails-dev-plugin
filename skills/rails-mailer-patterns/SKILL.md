@@ -80,10 +80,11 @@ Prevent sending real emails in staging — redirects all mail to a safe inbox:
 # app/mailers/interceptors/staging_interceptor.rb
 class StagingInterceptor
   def self.delivering_email(message)
+    original_to = message.to
     message.to = ["staging-inbox@example.com"]
     message.cc = nil
     message.bcc = nil
-    message.subject = "[STAGING] #{message.subject} (was: #{message.to})"
+    message.subject = "[STAGING] #{message.subject} (was: #{original_to.join(', ')})"
   end
 end
 
@@ -100,7 +101,7 @@ end
 # spec/mailers/previews/order_mailer_preview.rb   (Service-oriented)
 class OrderMailerPreview < ActionMailer::Preview
   def confirmation
-    order = Order.first || FactoryBot.build(:order)
+    order = Order.first || Order.new(id: 1, number: "PREVIEW-001", created_at: Time.current)
     OrderMailer.confirmation(order)
   end
 

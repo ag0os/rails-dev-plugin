@@ -155,7 +155,7 @@ None — use standard Rails base classes (ApplicationRecord, ApplicationControll
 1. **Read** `app/jobs/application_job.rb` — look for `queue_as`, `retry_on`, `discard_on`, included modules
 2. **Glob** `app/jobs/**/*.rb` — count and note naming pattern (VerbNounJob, NounVerbJob)
 3. **Read** first 15 lines of 1-2 job files to detect structure and conventions
-4. **Read** `config/sidekiq.yml` or `config/solid_queue.yml` for queue names and concurrency settings
+4. **Read** `config/sidekiq.yml` or `config/queue.yml` (Solid Queue, Rails 8 default) for queue names and concurrency settings
 5. **Grep** `Gemfile` for `sidekiq`, `solid_queue`, `good_job`, `resque`
 
 ### Common Variants
@@ -163,7 +163,7 @@ None — use standard Rails base classes (ApplicationRecord, ApplicationControll
 | Pattern | Interpretation |
 |---|---|
 | `config/sidekiq.yml` with named queues | Sidekiq with custom queue topology |
-| `config/solid_queue.yml` | Solid Queue (Rails 8 default) |
+| `config/queue.yml` | Solid Queue (Rails 8 default) |
 | `retry_on` in ApplicationJob | Global retry strategy |
 | `retry_on` per-job only | Per-job retry strategy |
 | VerbNounJob naming (e.g., `SendEmailJob`) | Standard Rails job naming |
