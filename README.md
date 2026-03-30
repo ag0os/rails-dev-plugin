@@ -5,7 +5,7 @@
 [![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/ag0os/rails-dev-plugin/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-A Claude Code plugin that provides 11 specialized agents and 18 portable skills covering models, controllers, views, services, jobs, testing, architecture, DevOps, GraphQL, Hotwire, API design, and more.
+A Claude Code plugin that provides specialized agents and portable skills covering models, controllers, views, services, jobs, testing, architecture, DevOps, GraphQL, Hotwire, API design, and more.
 
 Agents auto-detect your project's stack profile (omakase, service-oriented, or api-first) and coding conventions, then generate code that matches your project — not generic Rails.
 
