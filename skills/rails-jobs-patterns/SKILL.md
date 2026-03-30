@@ -182,7 +182,7 @@ end
 | No idempotency guard | Duplicate processing on retry | Check status before processing |
 | Bare `rescue => e` swallowing errors | Silent failures, no retries | Re-raise after logging |
 | Long-running single job (>30 min) | Memory bloat, queue blocking | Split into batches |
-| Business logic inside job | Hard to test, tight coupling | Delegate to service objects |
+| Business logic inside job | Hard to test, tight coupling | **Omakase:** delegate to model methods. **Service-oriented:** delegate to service objects |
 | No queue segmentation | Urgent jobs blocked by bulk work | Use priority queues |
 | Synchronous external calls in jobs | Timeouts block workers | Set timeouts, use circuit breakers |
 

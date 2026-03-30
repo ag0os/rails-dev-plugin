@@ -24,6 +24,9 @@ See [patterns.md](patterns.md) for detailed decision frameworks and anti-pattern
 | Views | rails-views-patterns | rails-views | ERB, partials, helpers, caching, accessibility |
 | Testing | rails-testing-patterns | rails-test | RSpec, Minitest, system/integration tests |
 | DevOps | rails-devops-patterns | rails-devops | Docker, CI/CD, monitoring, security |
+| Mailers | rails-mailer-patterns | (skill only) | Action Mailer, previews, delivery, interceptors |
+| Auth | rails-auth-patterns | (skill only) | has_secure_password, Devise, sessions, password reset |
+| Caching | rails-caching-patterns | (skill only) | Fragment, low-level, HTTP caching, invalidation |
 | Refactoring | ruby-refactoring | (skill only) | Code smells, refactoring patterns, Ruby Science |
 | Object Design | ruby-object-design | (skill only) | Class vs module, Struct, Data, design decisions |
 

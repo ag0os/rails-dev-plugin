@@ -30,9 +30,64 @@ See [patterns.md](patterns.md) for detailed code examples for both frameworks.
 5. **No test interdependence** -- tests must pass in any order
 6. **Fast feedback** -- unit tests < 100ms, system tests < 5s
 
+## Profile-Aware Testing
+
+**Detect the project's profile before recommending a testing approach.**
+
+| Decision | Omakase | Service-Oriented |
+|----------|---------|-----------------|
+| Framework | Minitest | RSpec |
+| Test data | Fixtures | FactoryBot |
+| Directory | `test/` | `spec/` |
+| Test priority | Integration/controller tests first | Unit tests + request specs |
+| Fixtures style | Realistic data (doubles as seed data) | Minimal factories + traits |
+
 ## Key Patterns
 
-### RSpec Model Spec
+### Minitest + Fixtures (Omakase)
+
+```ruby
+# test/fixtures/users.yml — use realistic data
+jane:
+  email: jane@example.com
+  first_name: Jane
+  last_name: Doe
+  role: member
+
+admin:
+  email: admin@company.com
+  first_name: Admin
+  last_name: User
+  role: admin
+```
+
+```ruby
+class UserTest < ActiveSupport::TestCase
+  test "should not save without email" do
+    user = User.new
+    assert_not user.save, "Saved user without email"
+  end
+
+  test "full_name returns combined name" do
+    user = users(:jane)
+    assert_equal "Jane Doe", user.full_name
+  end
+end
+```
+
+```ruby
+# Integration test — omakase prioritizes testing the full stack
+class UsersControllerTest < ActionDispatch::IntegrationTest
+  test "should create user" do
+    assert_difference("User.count") do
+      post users_url, params: { user: { email: "new@example.com" } }
+    end
+    assert_redirected_to user_url(User.last)
+  end
+end
+```
+
+### RSpec + FactoryBot (Service-Oriented)
 
 ```ruby
 RSpec.describe User, type: :model do
@@ -51,24 +106,6 @@ RSpec.describe User, type: :model do
 end
 ```
 
-### Minitest Model Test
-
-```ruby
-class UserTest < ActiveSupport::TestCase
-  test "should not save without email" do
-    user = User.new
-    assert_not user.save, "Saved user without email"
-  end
-
-  test "full_name returns combined name" do
-    user = User.new(first_name: "Jane", last_name: "Doe")
-    assert_equal "Jane Doe", user.full_name
-  end
-end
-```
-
-### Request Spec (RSpec)
-
 ```ruby
 RSpec.describe "Products API", type: :request do
   describe "GET /api/v1/products" do
@@ -79,19 +116,6 @@ RSpec.describe "Products API", type: :request do
       expect(response).to have_http_status(:ok)
       expect(json_response.size).to eq(3)
     end
-  end
-end
-```
-
-### Integration Test (Minitest)
-
-```ruby
-class UsersControllerTest < ActionDispatch::IntegrationTest
-  test "should create user" do
-    assert_difference("User.count") do
-      post users_url, params: { user: { email: "new@example.com" } }
-    end
-    assert_redirected_to user_url(User.last)
   end
 end
 ```
@@ -123,12 +147,22 @@ end
 
 ## Test Data Strategy
 
+**Omakase profile — fixtures first:**
+
+| Approach | When | Notes |
+|----------|------|-------|
+| Fixtures | Default for all test data | Loaded once, fast, doubles as seed data |
+| Realistic names | Always | `jane:`, `admin:` — not `user_1:`, `user_2:` |
+| Inline `User.new(...)` | One-off edge cases | When fixture doesn't cover the scenario |
+
+**Service-oriented profile — factories first:**
+
 | Approach | When | Tool |
 |----------|------|------|
-| Factories | Dynamic, unique data per test | FactoryBot |
-| Fixtures | Static reference data, fast | YAML fixtures |
+| Factories | Default for all test data | FactoryBot |
 | Traits | Variations of a factory | `factory :user, trait: :admin` |
 | Sequences | Unique values (emails, slugs) | `sequence(:email)` |
+| Fixtures | Rarely — static reference data only | YAML fixtures |
 
 ## Edge Cases to Always Test
 

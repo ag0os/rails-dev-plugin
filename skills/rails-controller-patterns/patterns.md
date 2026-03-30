@@ -422,28 +422,15 @@ end
 
 ## Authorization Patterns
 
-### Model-Based Authorization (Alternative to Pundit/CanCanCan)
+### Model-Based Authorization (Omakase Profile)
 
-**Context Awareness**: IMPORTANT - Check project dependencies first!
+**Profile:** This is the omakase approach. Check the project's stack profile first.
 
-**Detection**: Check `Gemfile` for authorization gems:
-```ruby
-# If you find these, DO NOT use model-based auth:
-gem 'pundit'
-gem 'cancancan'
-```
+- **Omakase profile:** Use this pattern. Authorization logic lives in the domain model.
+- **Service-oriented profile:** Use Pundit policy objects instead (see below).
+- **If Pundit or CanCanCan is already installed:** respect the existing choice.
 
-**When to Use**:
-- New projects without existing authorization
-- Simple authorization needs
-- User explicitly asks to simplify/remove Pundit
-
-**When NOT to Use**:
-- Pundit or CanCanCan already installed
-- Complex permission requirements
-- Unless migrating away from these gems
-
-**Pattern** (use only if no auth gem present):
+**Pattern** (omakase — no auth gem):
 
 ```ruby
 # In controller
@@ -473,13 +460,44 @@ class User < ApplicationRecord
 end
 ```
 
-**Benefits** (when applicable):
+**Benefits** (omakase):
 - Simpler than full authorization frameworks
 - Authorization logic lives with domain models
 - Easy to understand and test
 - No DSL to learn
 
-**Migration Path**: Only suggest removing Pundit/CanCanCan if user explicitly asks to simplify authorization.
+### Pundit Policy Objects (Service-Oriented Profile)
+
+**Profile:** This is the service-oriented approach. Use when `pundit` gem is present.
+
+```ruby
+# app/policies/post_policy.rb
+class PostPolicy < ApplicationPolicy
+  def update?
+    record.user == user || user.admin?
+  end
+
+  def destroy?
+    user.admin?
+  end
+end
+
+# In controller
+class PostsController < ApplicationController
+  def update
+    @post = Post.find(params[:id])
+    authorize @post
+    # ...
+  end
+end
+```
+
+**Benefits** (service-oriented):
+- Testable policy objects with clear interface
+- Consistent authorization pattern across app
+- Scopeable (`policy_scope(Post)` for filtered queries)
+
+**Profile detection:** Check `Gemfile` for `pundit` or `cancancan`. If present, use that. If absent and omakase profile, use model-based auth.
 
 ## Pagination Pattern
 
@@ -627,9 +645,10 @@ end
 - Use before_actions for repetitive setup
 - Return appropriate status codes
 - Use strong parameters
-- Delegate business logic to models/services
-- Check project context before suggesting patterns (see Context Awareness Reference)
-- Prefer resource controllers over custom actions
+- **Omakase:** delegate business logic to models and concerns
+- **Service-oriented:** delegate business logic to service objects
+- **Both:** check project stack profile before suggesting patterns
+- Prefer dedicated resource controllers over custom actions
 - Use layered concerns for shared setup logic
 
 ### Don't
@@ -639,4 +658,5 @@ end
 - Nest resources more than one level deep
 - Create non-RESTful actions without good reason
 - Suggest model-based auth when Pundit/CanCanCan is installed
+- Suggest Pundit/Devise to omakase projects that use built-in auth
 - Use `params.expect` in Rails < 7.1

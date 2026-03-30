@@ -26,11 +26,12 @@ Analyze and recommend patterns for well-structured, thin Rails controllers.
 
 ## Core Principles
 
-1. **Thin controllers**: Handle HTTP concerns only; delegate business logic to models/services
-2. **RESTful by default**: Stick to 7 standard actions; create new controllers for custom actions
+1. **Thin controllers**: Handle HTTP concerns only; delegate business logic. **Omakase:** delegate to models and concerns. **Service-oriented:** delegate to service objects
+2. **RESTful by default**: Stick to 7 standard actions; create new resource controllers for custom actions
 3. **Strong parameters always**: Never trust user input; use `params.expect` (Rails 8+)
 4. **Consistent responses**: `redirect_to` after success, `render :action, status:` on failure
 5. **One resource per controller**: Avoid multi-resource controllers
+6. **Dedicated resource controllers**: Prefer `Cards::ClosuresController` over `post :close` on `CardsController`
 
 ## Controller Structure Template
 
@@ -165,8 +166,9 @@ end
 
 | Anti-Pattern | Problem | Fix |
 |-------------|---------|-----|
-| Fat controllers (50+ line actions) | Hard to test and maintain | Extract to service objects |
-| Business logic in controllers | Violates SRP | Move to models or services |
+| Fat controllers (50+ line actions) | Hard to test and maintain | **Omakase:** move logic to model methods/concerns. **Service-oriented:** extract to service objects |
+| Business logic in controllers | Violates SRP | **Omakase:** move to models. **Service-oriented:** move to services |
+| Custom member actions (`:close`, `:archive`) | Controller grows unbounded | Create dedicated resource controllers (`Cards::ClosuresController`) |
 | `params.permit!` | Allows all params (mass assignment) | Use `params.expect` with explicit fields |
 | Deeply nested routes (>1 level) | Confusing URLs and helpers | Use `shallow: true` or flat routes |
 | Skipping authentication filters | Security vulnerability | Apply `before_action` broadly, skip selectively |

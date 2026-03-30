@@ -85,6 +85,43 @@ end
 <% end %>
 ```
 
+## Presenter Objects (Omakase)
+
+**Omakase profile:** When view logic gets complex, use a plain Ruby object as a presenter — not a ViewComponent.
+
+```ruby
+# app/models/column.rb (or app/presenters/column.rb)
+class Column
+  attr_reader :events, :date
+
+  def initialize(events:, date:)
+    @events = events
+    @date = date
+  end
+
+  def grouped_events
+    events.group_by(&:category).sort_by { |cat, _| cat.position }
+  end
+
+  def empty? = events.none?
+  def title  = date.strftime("%A, %B %d")
+end
+```
+
+```erb
+<%# In view — clean API, no logic %>
+<% @columns.each do |column| %>
+  <div class="column">
+    <h3><%= column.title %></h3>
+    <% column.grouped_events.each do |category, events| %>
+      <%= render partial: "event", collection: events %>
+    <% end %>
+  </div>
+<% end %>
+```
+
+**Service-oriented profile:** ViewComponents are also fine — see [patterns.md](patterns.md) for ViewComponent patterns.
+
 ## Anti-Patterns
 
 | Bad | Good | Why |

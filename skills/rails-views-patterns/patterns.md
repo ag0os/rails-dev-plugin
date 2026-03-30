@@ -82,7 +82,9 @@ Rails provides a `product_counter` local (0-indexed) automatically:
 </div>
 ```
 
-## ViewComponent Patterns
+## ViewComponent Patterns (Service-Oriented)
+
+**Profile:** ViewComponents are a service-oriented pattern. **Omakase** projects prefer helpers, partials, and presenter POROs instead. Use ViewComponents when the `view_component` gem is already in the project.
 
 When using the `view_component` gem:
 
