@@ -10,18 +10,18 @@ Analyze and recommend Stimulus + Turbo patterns for modern, interactive Rails ap
 
 ## Quick Reference
 
-| Component | Purpose | Use When |
-|-----------|---------|----------|
-| Stimulus | JS behaviors on HTML | Adding interactivity to server-rendered HTML |
-| Turbo Drive | SPA-like navigation | Default for all links/forms (no config needed) |
-| Turbo Frames | Partial page updates | Update a section without full reload |
-| Turbo Streams | Multi-target updates | Update multiple DOM elements from one response |
-| ActionCable + Streams | Real-time broadcasts | Push updates to all connected clients |
+| Component | Use When |
+|-----------|----------|
+| Stimulus | Adding JS behaviors to server-rendered HTML |
+| Turbo Drive | Default for all links/forms (no config needed) |
+| Turbo Frames | Update a section without full reload |
+| Turbo Streams | Update multiple DOM elements from one response |
+| ActionCable + Streams | Push real-time updates to connected clients |
 
 ## Supporting Documentation
 
-- [stimulus.md](stimulus.md) - Stimulus controller patterns and lifecycle
-- [turbo.md](turbo.md) - Turbo Frames and Streams patterns
+- [stimulus.md](stimulus.md) - Stimulus integration patterns and production gotchas
+- [turbo.md](turbo.md) - Turbo Frames, Streams, and version-aware patterns
 
 ## Core Philosophy
 
@@ -32,93 +32,20 @@ Analyze and recommend Stimulus + Turbo patterns for modern, interactive Rails ap
 3. **Minimal JavaScript**: Just enough JS to make HTML interactive
 4. **No client-side state**: Server is the source of truth
 
-## Stimulus Controller Template
+## Decision Guide: Frames vs Streams
 
-```javascript
-// app/javascript/controllers/dropdown_controller.js
-import { Controller } from "@hotwired/stimulus"
-
-export default class extends Controller {
-  static targets = ["menu"]
-  static classes = ["open"]
-  static values = { open: { type: Boolean, default: false } }
-
-  toggle() { this.openValue = !this.openValue }
-
-  openValueChanged() {
-    this.menuTarget.classList.toggle(this.openClass, this.openValue)
-  }
-
-  close(event) {
-    if (!this.element.contains(event.target)) this.openValue = false
-  }
-}
-```
-
-```erb
-<div data-controller="dropdown" data-dropdown-open-class="is-open"
-     data-action="click@window->dropdown#close">
-  <button data-action="dropdown#toggle">Menu</button>
-  <div data-dropdown-target="menu">Content</div>
-</div>
-```
-
-## Controller Communication
-
-```javascript
-// Outlets: direct reference to another controller
-static outlets = ["search-results"]
-filter() {
-  if (this.hasSearchResultsOutlet) this.searchResultsOutlet.updateResults(query)
-}
-
-// Events: loosely coupled (dispatch + listen)
-this.dispatch("filter", { detail: { query }, prefix: "search" })
-// data-action="search:filter->results#handleFilter"
-```
-
-## Turbo Frames
-
-```erb
-<%# Scoped navigation - only replaces matching frame %>
-<turbo-frame id="<%= dom_id(@post) %>">
-  <%= render @post %>
-  <%= link_to "Edit", edit_post_path(@post) %>
-</turbo-frame>
-
-<%# Lazy loading %>
-<%= turbo_frame_tag "sidebar", src: sidebar_path, loading: :lazy do %>
-  <p>Loading...</p>
-<% end %>
-
-<%# Break out of frame %>
-<%= link_to "Full page", post_path(@post), data: { turbo_frame: "_top" } %>
-```
-
-## Turbo Streams
-
-```erb
-<%# app/views/posts/create.turbo_stream.erb %>
-<%= turbo_stream.prepend "posts", @post %>
-<%= turbo_stream.update "posts-count", Post.count %>
-<%= turbo_stream.replace "new-post-form" do %>
-  <%= render "form", post: Post.new %>
-<% end %>
-```
-
-## Broadcast Patterns (ActionCable)
-
-```ruby
-class Message < ApplicationRecord
-  after_create_commit { broadcast_prepend_to "messages" }
-  after_update_commit { broadcast_replace_to "messages" }
-  after_destroy_commit { broadcast_remove_to "messages" }
-  after_create_commit -> { broadcast_prepend_to(user, :notifications) }  # scoped
-end
-# View: <%= turbo_stream_from "messages" %>
-```
+| Scenario | Use | Why |
+|----------|-----|-----|
+| Edit-in-place | Frame | Scoped navigation, replaces itself |
+| Form creates item + updates counter | Stream | Multiple targets from one response |
+| Lazy sidebar | Frame with `loading: :lazy` | Deferred load, single target |
+| Real-time chat | ActionCable + Stream | Push from server to all clients |
+| Tabs/pagination | Frame | Scoped replacement |
+| Flash + content update | Stream | Two targets: flash div + content |
 
 ## ActionCable + Stimulus Integration
+
+This pattern is non-obvious -- it wires a Stimulus controller to an ActionCable subscription, giving you lifecycle-managed real-time behavior:
 
 ```javascript
 // app/javascript/controllers/chat_controller.js
@@ -146,39 +73,60 @@ export default class extends Controller {
 }
 ```
 
-## Form Enhancements
+Key: `disconnect()` must unsubscribe to prevent leaked subscriptions during Turbo navigation.
 
-```javascript
-// Auto-submit with debounce
-import { Controller } from "@hotwired/stimulus"
+## Critical Gotchas
 
-export default class extends Controller {
-  static values = { delay: { type: Number, default: 300 } }
-  connect() { this.timeout = null }
-  submit() {
-    clearTimeout(this.timeout)
-    this.timeout = setTimeout(() => this.element.requestSubmit(), this.delayValue)
-  }
-}
-// ERB: form_with data: { controller: "auto-submit", turbo_frame: "results" }
-// Input: data: { action: "input->auto-submit#submit" }
+### Missing 422 Status Code
+
+Turbo will NOT render form error responses unless the server returns `status: :unprocessable_entity` (422). This is the #1 Hotwire debugging issue:
+
+```ruby
+# WRONG: Turbo ignores this response
+format.html { render :new }
+
+# RIGHT: Turbo processes the response
+format.html { render :new, status: :unprocessable_entity }
 ```
 
-## Lazy Loading
+### Frame ID Mismatch (Silent Failure)
 
-Use `IntersectionObserver` in a Stimulus controller to fetch content when elements scroll into view. Combine with `turbo-frame loading: :lazy` for server-rendered lazy frames. See [stimulus.md](stimulus.md) for full implementation.
+If the response HTML does not contain a `<turbo-frame>` with a matching `id`, nothing happens -- no error, no update. Debug with:
+- Browser console: look for "Response has no matching <turbo-frame id="...">" warning
+- Verify `dom_id(@record)` produces the same ID on both pages
+- Check that the edit/show view wraps content in the same frame tag
+
+### Broadcasting Without Scoping
+
+```ruby
+# WRONG: every connected user sees every message
+after_create_commit { broadcast_prepend_to "messages" }
+
+# RIGHT: scope to the relevant stream
+after_create_commit -> { broadcast_prepend_to(room, :messages) }
+after_create_commit -> { broadcast_prepend_to(user, :notifications) }  # per-user
+```
 
 ## Anti-Patterns
 
 | Anti-Pattern | Problem | Fix |
 |-------------|---------|-----|
 | Client-side state management | Fights Hotwire's server-first model | Keep state on server, re-render HTML |
-| Turbo Frame id mismatch | Silent failures, nothing updates | Match frame IDs exactly between pages |
-| Missing `status: :unprocessable_entity` | Turbo won't render form errors | Always return 422 on validation failure |
 | Fat Stimulus controllers (100+ lines) | Hard to maintain | Extract into multiple focused controllers |
-| Inline JS instead of Stimulus | No lifecycle, no reuse | Use Stimulus controllers |
 | Broadcasting without scoping | All users see all updates | Scope broadcasts to relevant streams |
 | No `loading: :lazy` on hidden frames | Unnecessary requests on page load | Use lazy loading for below-fold content |
+| Streams when a Frame suffices | Overcomplicated | Use Frames for single-target scoped nav |
+
+## Progressive Enhancement Checklist
+
+Before shipping any Hotwire feature, verify:
+
+- [ ] Core functionality works with Turbo Drive disabled (`data-turbo="false"`)
+- [ ] Forms submit successfully without JS (standard HTML submission)
+- [ ] Links navigate to full pages without Turbo Frames
+- [ ] Stimulus controllers degrade gracefully (content visible without JS)
+- [ ] `data-turbo-permanent` preserves media players, ActionCable connections across navigation
+- [ ] `data-turbo="false"` on file downloads and external links
 
 ## Output Format
 
@@ -188,11 +136,3 @@ When analyzing or creating Hotwire components, provide:
 3. **Controller action** with `turbo_stream` response format
 4. **Model broadcasts** if real-time updates needed
 5. **Cable subscription** if ActionCable integration required
-
-## Error Handling
-
-- Return `status: :unprocessable_entity` for form validation failures (Turbo requirement)
-- Use `turbo_stream.replace` to re-render forms with error messages
-- Handle Stimulus `connect`/`disconnect` lifecycle for cleanup (subscriptions, observers)
-- Use `data-turbo-permanent` to preserve elements across navigation (flash, audio players)
-- Set `data-turbo="false"` on links/forms that should not use Turbo (file downloads, external)

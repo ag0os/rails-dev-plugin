@@ -6,157 +6,161 @@ allowed-tools: Read, Grep, Glob
 
 # Rails Caching Patterns
 
-Analyze and recommend caching strategies across all layers of a Rails application — from HTTP to fragment to low-level caching.
+Analyze and recommend caching strategies across all layers of a Rails application.
+
+Follow standard Rails conventions for basic `cache` helper, `Rails.cache.fetch`, `stale?`/`fresh_when`, and `expires_in`. Focus on the opinionated patterns below.
 
 See [patterns.md](patterns.md) for detailed code examples.
 
 ## Quick Reference
 
-| Layer | Technique | Where | Cache Hit Avoids |
-|-------|-----------|-------|-----------------|
-| HTTP | `stale?` / `fresh_when` | Controller | Entire response render |
-| Fragment | `cache do...end` | View | Partial/template render |
-| Low-level | `Rails.cache.fetch` | Anywhere | Expensive computation |
-| Query | Counter cache, memoization | Model | Database query |
-| Collection | `render collection:, cached: true` | View | Per-item partial render |
+| Pattern | Use When |
+|---------|----------|
+| Russian doll + `touch: true` | Nested associations — inner updates bust outer caches |
+| `race_condition_ttl` | High-traffic keys — prevents cache stampede on expiry |
+| `fetch_multi` | Multiple cache reads — one round-trip instead of N |
+| Collection caching (`cached: true`) | Rendering collections — uses `read_multi` internally |
+| Solid Cache vs Redis | **Omakase:** Solid Cache. **Service-oriented:** Redis |
+| Composite cache keys | Varying by user, locale, or version |
 
 ## Profile-Aware Cache Store
 
-| Profile | Default Store | Config |
-|---------|--------------|--------|
-| **Omakase** | Solid Cache | `config.cache_store = :solid_cache_store` |
-| **Service-oriented** | Redis | `config.cache_store = :redis_cache_store, { url: ENV["REDIS_URL"] }` |
-| **Development** | Memory store | `config.cache_store = :memory_store` |
+| Profile | Store | Why |
+|---------|-------|-----|
+| **Omakase** | `config.cache_store = :solid_cache_store` | No external deps, database-backed, Rails 8 default |
+| **Service-oriented** | `config.cache_store = :redis_cache_store, { url: ENV["REDIS_URL"] }` | Already running Redis for Sidekiq/ActionCable |
+| **Development** | `:memory_store` | Toggle with `bin/rails dev:cache` |
 
 ## Core Principles
 
 1. **Cache the expensive thing closest to where it's used**: HTTP > fragment > low-level
-2. **Key-based expiration over manual invalidation**: Let cache keys change when data changes
-3. **Measure before caching**: Don't cache what isn't slow. Use `rack-mini-profiler` or server timing
-4. **Russian doll from the outside in**: Outer cache wraps inner caches; `touch: true` propagates changes
+2. **Key-based expiration over manual invalidation**: Let `cache_key_with_version` change when data changes
+3. **Measure before caching**: Use `rack-mini-profiler` or server timing — don't cache what isn't slow
+4. **Russian doll from outside in**: `touch: true` propagates changes up the association chain
 5. **Never cache user-specific content in shared caches** without varying the key
 
-## HTTP Caching (Controller)
+## Russian Doll Caching
 
-Prevents the server from rendering at all when content hasn't changed:
+The critical setup: `touch: true` on associations propagates `updated_at` changes upward.
 
 ```ruby
-class ProductsController < ApplicationController
-  def show
-    @product = Product.find(params[:id])
+class Comment < ApplicationRecord
+  belongs_to :post, touch: true
+end
 
-    # Returns 304 Not Modified if product hasn't changed
-    if stale?(@product)
-      respond_to do |format|
-        format.html
-        format.json { render json: @product }
-      end
-    end
-  end
-
-  def index
-    @products = Product.active.order(:updated_at)
-
-    # fresh_when — simpler API when you just render
-    fresh_when @products
-  end
+class Post < ApplicationRecord
+  belongs_to :category, touch: true
+  has_many :comments, dependent: :destroy
 end
 ```
-
-## Fragment Caching (Views)
 
 ```erb
-<%# Basic %>
-<% cache @product do %>
-  <%= render "products/card", product: @product %>
+<% cache @category do %>
+  <h2><%= @category.name %></h2>
+  <% @category.posts.includes(:comments).each do |post| %>
+    <% cache post do %>
+      <h3><%= post.title %></h3>
+      <% post.comments.each do |comment| %>
+        <% cache comment do %>
+          <p><%= comment.body %></p>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% end %>
 <% end %>
-
-<%# Collection — uses read_multi for one cache round-trip %>
-<%= render partial: "products/product", collection: @products, cached: true %>
-
-<%# Conditional — only cache for anonymous users %>
-<% cache_if current_user.nil?, @product do %>
-  <%= render "products/card", product: @product %>
-<% end %>
 ```
 
-### Russian Doll Caching
+**How it works**: Comment updated -> `post.touch` -> `category.touch`. Only changed fragments re-render; unchanged siblings hit cache.
 
-Nested caches — inner updates only bust the inner fragment. Requires `touch: true` on child associations.
+## Race Condition TTL
 
-```ruby
-class Product < ApplicationRecord
-  belongs_to :category, touch: true
-end
-```
-
-See [patterns.md](patterns.md) for Russian doll view examples, collection ETags, and conditional caching.
-
-## Low-Level Caching
-
-For expensive computations, external API calls, or complex queries:
-
-```ruby
-class Product < ApplicationRecord
-  def expensive_stats
-    Rails.cache.fetch("product/#{id}/stats", expires_in: 1.hour) do
-      {
-        avg_rating: reviews.average(:rating)&.round(2),
-        review_count: reviews.count,
-        sales_rank: calculate_sales_rank
-      }
-    end
-  end
-end
-```
-
-### Race Condition TTL
-
-Prevents cache stampede when many requests hit an expired key simultaneously:
+Prevents cache stampede when many requests hit an expired key simultaneously. First request recalculates; others get stale data for the TTL window:
 
 ```ruby
 Rails.cache.fetch("dashboard/stats", expires_in: 5.minutes, race_condition_ttl: 30.seconds) do
-  DashboardStats.calculate
+  DashboardStats.calculate  # Expensive
 end
 ```
 
-## Cache Key Strategies
+## Collection Caching with `read_multi`
 
-```ruby
-# Automatic (preferred) — changes when record updates
-@product.cache_key_with_version
-# => "products/123-20240115123456789000"
+One cache round-trip for the entire collection:
 
-# Composite — varies by multiple factors
-cache [@product, current_user.locale, "v2"] do ...end
-
-# Template digest — Rails auto-includes in cache key
-cache @product do ...end  # Changing the template busts the cache
+```erb
+<%= render partial: "products/product", collection: @products, cached: true %>
 ```
 
-## Memoization (Request-Level Cache)
+## `fetch_multi` for Batch Cache Reads
+
+Avoid N cache round-trips:
 
 ```ruby
-class User < ApplicationRecord
-  def permissions
-    @permissions ||= roles.flat_map(&:permissions).uniq
+class Product < ApplicationRecord
+  def self.with_cached_stats(products)
+    keys = products.map { |p| "product/#{p.id}/stats" }
+
+    cached = Rails.cache.fetch_multi(*keys, expires_in: 1.hour) do |key|
+      product_id = key.split("/")[1].to_i
+      calculate_stats_for(product_id)
+    end
+
+    products.each do |product|
+      product.cached_stats = cached["product/#{product.id}/stats"]
+    end
   end
 end
 ```
 
-See [patterns.md](patterns.md) for cache invalidation strategies, fetch_multi, write-through cache, counter caches, and performance measurement.
+## Composite Cache Keys
+
+```ruby
+# Varies by multiple factors
+cache [@product, current_user.locale, "v2"] do ... end
+
+# Conditional caching — skip cache for admins
+cache_if !current_user&.admin?, @product do ... end
+```
+
+## Write-Through Cache
+
+Update cache proactively when data changes instead of waiting for expiry:
+
+```ruby
+class Product < ApplicationRecord
+  after_commit :update_cache, on: [:create, :update]
+  after_commit :clear_cache, on: :destroy
+
+  def cached_stats
+    Rails.cache.fetch(stats_cache_key, expires_in: 1.day) do
+      calculate_stats
+    end
+  end
+
+  private
+
+  def update_cache
+    Rails.cache.write(stats_cache_key, calculate_stats, expires_in: 1.day)
+  end
+
+  def clear_cache
+    Rails.cache.delete(stats_cache_key)
+  end
+
+  def stats_cache_key = "product/#{id}/stats"
+end
+```
 
 ## Anti-Patterns
 
-| Anti-Pattern | Problem | Fix |
-|-------------|---------|-----|
-| Caching without measuring | Premature optimization | Profile first with rack-mini-profiler |
-| Manual cache invalidation everywhere | Stale data, complex code | Use key-based expiration (cache_key_with_version) |
-| Caching user-specific content globally | Data leaks between users | Include user/session in cache key, or use `cache_if` |
-| No `touch: true` with Russian doll | Parent cache never busts | Add `touch: true` on child associations |
-| Long `expires_in` without race_condition_ttl | Cache stampede on expiry | Add `race_condition_ttl: 30.seconds` |
-| Caching nil results | Thundering herd on missing data | Return a null object or empty result, not nil |
-| `Rails.cache.fetch` in a loop | N cache round-trips | Use `Rails.cache.fetch_multi` |
+| Anti-Pattern | Fix |
+|-------------|-----|
+| Caching without measuring | Profile first with `rack-mini-profiler` |
+| Manual invalidation everywhere | Use key-based expiration (`cache_key_with_version`) |
+| No `touch: true` with Russian doll | Parent cache never busts — add `touch: true` |
+| Long `expires_in` without `race_condition_ttl` | Cache stampede on expiry — add `race_condition_ttl: 30.seconds` |
+| `Rails.cache.fetch` in a loop | N round-trips — use `fetch_multi` |
+| Caching nil results | Thundering herd — return null object or empty result |
+| User-specific content in shared cache | Data leaks — include user/session in cache key |
 
 ## Output Format
 

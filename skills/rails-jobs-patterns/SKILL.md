@@ -8,16 +8,18 @@ allowed-tools: Read, Grep, Glob
 
 Analyze and recommend patterns for reliable, efficient background jobs in Rails applications.
 
+Follow standard Rails conventions for `retry_on`, `discard_on`, `queue_as`, and basic ActiveJob structure. Focus on the opinionated patterns below.
+
 ## Quick Reference
 
-| Pattern | Use When | Key Method |
-|---------|----------|------------|
-| `retry_on` | Transient errors (network, timeout) | `retry_on Net::Error, wait: :exponentially_longer` |
-| `discard_on` | Permanent failures (deleted record) | `discard_on ActiveJob::DeserializationError` |
-| Idempotency guard | Job may run more than once | `return if already_processed?` |
-| `with_lock` | Prevent concurrent execution | `record.with_lock { ... }` |
-| Batch processing | Large datasets | `find_in_batches(batch_size: 100)` |
-| Scheduled jobs | Recurring tasks | Solid Queue recurring or cron |
+| Pattern | Use When |
+|---------|----------|
+| `_later`/`_now` convention | Every async operation — name both versions |
+| Shallow job + model logic | All new jobs — jobs are wrappers only |
+| Double-check locking | Idempotency with concurrent workers |
+| Self-splitting batch | Datasets too large for one job |
+| `limits_concurrency` | Solid Queue race condition prevention |
+| `perform_all_later` | Bulk enqueueing (Rails 7.1+) |
 
 ## Supporting Documentation
 
@@ -25,101 +27,63 @@ Analyze and recommend patterns for reliable, efficient background jobs in Rails 
 
 ## Core Principles
 
-1. **Idempotency**: Jobs MUST be safe to run multiple times
-2. **Pass IDs, not objects**: Avoid serialization issues
-3. **Small payloads**: Keep arguments minimal and serializable
-4. **Explicit error handling**: Use `retry_on` / `discard_on` declaratively
-5. **Queue segmentation**: Separate urgent, default, and low-priority work
+1. **Jobs are shallow wrappers**: Business logic lives in models (omakase) or service objects (service-oriented). Jobs handle only queuing and retry infrastructure
+2. **`_later`/`_now` convention**: Define `thing_later` (queues job) and `thing` (does work) on the model. The job just calls the model method
+3. **Double-check locking for idempotency**: Guard clause THEN `with_lock` THEN guard again — prevents races between concurrent workers
+4. **Pass IDs, not objects**: Avoid serialization issues and stale data
+5. **Queue segmentation**: Separate critical, default, low, and mailers
 
-## Job Structure Template
+## The `_later`/`_now` Pattern (37signals)
 
 ```ruby
-class ProcessOrderJob < ApplicationJob
-  queue_as :default
+# Model defines both versions
+class Webhook::Delivery < ApplicationRecord
+  after_create_commit :deliver_later
 
-  retry_on ActiveRecord::RecordNotFound, wait: 5.seconds, attempts: 3
-  retry_on Net::OpenTimeout, wait: :exponentially_longer, attempts: 5
-  discard_on ActiveJob::DeserializationError
+  def deliver_later
+    Webhook::DeliveryJob.perform_later(self)
+  end
 
-  def perform(order_id)
-    order = Order.find(order_id)
-    return if order.processed?
+  def deliver
+    in_progress!
+    self.response = perform_request
+    completed!
+  rescue => e
+    failed!(e.message)
+  end
+end
 
-    order.with_lock do
-      return if order.processed?
-      OrderProcessor.new(order).process!
-      order.update!(status: "processed")
-    end
+# Job is a shallow wrapper — no business logic
+class Webhook::DeliveryJob < ApplicationJob
+  queue_as :webhooks
+  def perform(delivery)
+    delivery.deliver
   end
 end
 ```
 
-## Idempotency Patterns
+## Idempotency: Double-Check Locking
+
+The critical pattern — guard clause alone has a race window. Always combine with `with_lock`:
 
 ```ruby
-# Guard clause + lock
 def perform(import_id)
   import = Import.find(import_id)
-  return if import.completed?
+  return if import.completed?          # Fast path: skip lock if done
 
   import.with_lock do
-    return if import.completed?
+    return if import.completed?        # Safe path: re-check under lock
     process_import(import)
     import.update!(status: "completed")
   end
 end
-
-# Unique constraint (database-level)
-def perform(user_id, report_date)
-  Report.create_or_find_by!(user_id: user_id, date: report_date) do |report|
-    report.data = generate_report(user_id, report_date)
-  end
-end
 ```
 
-## Error Handling Strategies
+## Self-Splitting Batch Jobs
+
+For datasets too large for one job — the job re-enqueues itself for the next chunk:
 
 ```ruby
-class SendEmailJob < ApplicationJob
-  # Transient: retry with backoff
-  retry_on Net::SMTPServerError, wait: :exponentially_longer, attempts: 5
-
-  # Transient: retry with fixed wait
-  retry_on Timeout::Error, wait: 1.minute, attempts: 3
-
-  # Permanent: discard with logging
-  discard_on ActiveJob::DeserializationError do |job, error|
-    Rails.logger.error("[#{job.class}] Discarded: #{error.message}")
-  end
-
-  # Domain-specific: handle inline
-  def perform(payment_id)
-    payment = Payment.find(payment_id)
-    PaymentProcessor.charge!(payment)
-  rescue PaymentProcessor::CardExpired
-    payment.update!(status: "card_expired")
-    # Do not retry - user action needed
-  end
-end
-```
-
-## Batch Processing
-
-```ruby
-class BatchExportJob < ApplicationJob
-  def perform(export_id)
-    export = Export.find(export_id)
-
-    export.records.find_in_batches(batch_size: 500) do |batch|
-      batch.each { |record| ProcessRecordJob.perform_later(record.id) }
-      export.increment!(:processed_count, batch.size)
-    end
-
-    export.update!(status: "completed")
-  end
-end
-
-# Self-splitting for very large datasets
 class LargeImportJob < ApplicationJob
   BATCH_SIZE = 1_000
 
@@ -133,64 +97,78 @@ class LargeImportJob < ApplicationJob
 end
 ```
 
-## Scheduled Jobs
+## Concurrency Control
+
+### Solid Queue — `limits_concurrency`
 
 ```ruby
-# Recurring job with duplicate prevention
-class DailyReportJob < ApplicationJob
-  def perform(date = Date.current)
-    return if Report.exists?(date: date, report_type: "daily")
+class Storage::MaterializeJob < ApplicationJob
+  queue_as :backend
+  limits_concurrency to: 1, key: ->(owner) { owner }
 
-    report = Report.create!(date: date, report_type: "daily", data: generate_data(date))
-    ReportMailer.daily(report).deliver_later
+  def perform(owner)
+    owner.materialize_storage
   end
 end
 ```
 
-## Queue Configuration
-
-```yaml
-# config/sidekiq.yml
-:queues:
-  - [critical, 6]  # payments, auth
-  - [default, 3]   # standard processing
-  - [low, 1]       # reports, cleanup
-  - [mailers, 2]   # email delivery
-```
-
-## Monitoring and Logging
+### Sidekiq — `sidekiq-unique-jobs`
 
 ```ruby
-class MonitoredJob < ApplicationJob
-  around_perform do |job, block|
-    start = Time.current
-    Rails.logger.info("[#{job.class}] Starting args=#{job.arguments}")
-    block.call
-    Rails.logger.info("[#{job.class}] Completed in #{Time.current - start}s")
-  rescue => e
-    Rails.logger.error("[#{job.class}] Failed: #{e.message}")
-    raise
+class SyncUserJob < ApplicationJob
+  sidekiq_options lock: :until_executed,
+                  lock_args_method: ->(args) { [args.first] }
+
+  def perform(user_id)
+    UserSyncService.new(user_id).sync!
   end
 end
 ```
+
+Lock types: `:until_executing` (unique in queue), `:until_executed` (through completion), `:until_and_while_executing` (most restrictive).
+
+## Bulk Enqueueing (Rails 7.1+)
+
+```ruby
+class Notification::Bundle
+  def self.deliver_all_later
+    due.find_in_batches do |batch|
+      jobs = batch.map { |bundle| DeliverJob.new(bundle) }
+      ActiveJob.perform_all_later(jobs)  # Single DB operation
+    end
+  end
+end
+```
+
+## Multi-Tenant Context Serialization
+
+For apps using `CurrentAttributes` with multi-tenancy — automatically serialize account context across job execution. See [patterns.md](patterns.md) for the `FizzyActiveJobExtensions` pattern that captures `Current.account` on enqueue and restores it on perform.
+
+**Skip this pattern for single-tenant apps.**
 
 ## Anti-Patterns
 
-| Anti-Pattern | Problem | Fix |
-|-------------|---------|-----|
-| Passing full objects as args | Serialization failures, stale data | Pass IDs, reload inside job |
-| No idempotency guard | Duplicate processing on retry | Check status before processing |
-| Bare `rescue => e` swallowing errors | Silent failures, no retries | Re-raise after logging |
-| Long-running single job (>30 min) | Memory bloat, queue blocking | Split into batches |
-| Business logic inside job | Hard to test, tight coupling | **Omakase:** delegate to model methods. **Service-oriented:** delegate to service objects |
-| No queue segmentation | Urgent jobs blocked by bulk work | Use priority queues |
-| Synchronous external calls in jobs | Timeouts block workers | Set timeouts, use circuit breakers |
+| Anti-Pattern | Fix |
+|-------------|-----|
+| Business logic inside job | **Omakase:** delegate to model. **Service-oriented:** delegate to service |
+| Guard clause without `with_lock` | Use double-check locking pattern above |
+| `find_in_batches` all in one job | Self-splitting batch or `perform_all_later` |
+| No queue segmentation | Use priority queues (critical/default/low/mailers) |
+
+## Context Detection
+
+| Check | Command | Implication |
+|-------|---------|-------------|
+| Job adapter | `grep "queue_adapter" config/` | Solid Queue vs Sidekiq patterns |
+| Multi-tenancy | `grep "Current.account" app/` | Context serialization needed |
+| Rails version | `grep "rails " Gemfile.lock` | `perform_all_later` available 7.1+ |
+| Recurring jobs | Check `config/recurring.yml` or `sidekiq_schedule.yml` | Respect existing scheduler |
 
 ## Output Format
 
 When analyzing or creating jobs, provide:
 1. **Job file** in `app/jobs/` with retry/discard configuration
-2. **Idempotency strategy** (guard clause, lock, unique constraint)
+2. **Idempotency strategy** (double-check locking, unique constraint)
 3. **Queue assignment** with rationale
 4. **Test outline** using `ActiveJob::TestHelper`
 5. **Monitoring** notes (logging, metrics, alerting)

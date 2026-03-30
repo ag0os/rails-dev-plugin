@@ -6,9 +6,21 @@ allowed-tools: Read, Grep, Glob
 
 # Rails Architecture Patterns
 
-Provide architectural planning frameworks, design principles, and decision guidance for Rails applications. Coordinate across domain skills and agents.
+Architectural planning frameworks and decision guidance. Coordinate across domain skills and agents.
 
-See [patterns.md](patterns.md) for detailed decision frameworks and anti-patterns.
+See [patterns.md](patterns.md) for detailed decision frameworks and profile-aware anti-pattern fixes.
+
+## Stack Profile Awareness
+
+**Before recommending patterns, determine the project's stack profile.** See `rails-stack-profiles` for detection logic.
+
+| Decision | Omakase | Service-Oriented | API-First |
+|----------|---------|-----------------|-----------|
+| Business logic home | Models + concerns | Service objects | Service/command objects |
+| Fat controller fix | Extract to concern/model | Extract to service | Extract to service |
+| Testing | Minitest + fixtures | RSpec + FactoryBot | RSpec + FactoryBot |
+| Auth | `has_secure_password` | Devise | JWT/token |
+| Job backend | Solid Queue | Sidekiq | Sidekiq or Solid Queue |
 
 ## Available Domain Skills and Agents
 
@@ -27,58 +39,24 @@ See [patterns.md](patterns.md) for detailed decision frameworks and anti-pattern
 | Mailers | rails-mailer-patterns | (skill only) | Action Mailer, previews, delivery, interceptors |
 | Auth | rails-auth-patterns | (skill only) | has_secure_password, Devise, sessions, password reset |
 | Caching | rails-caching-patterns | (skill only) | Fragment, low-level, HTTP caching, invalidation |
-| Refactoring | ruby-refactoring | (skill only) | Code smells, refactoring patterns, Ruby Science |
+| Refactoring | ruby-refactoring | (skill only) | Code smells, refactoring patterns |
 | Object Design | ruby-object-design | (skill only) | Class vs module, Struct, Data, design decisions |
-
-## Stack Profile Awareness
-
-**Before recommending patterns, determine the project's stack profile.** See `rails-stack-profiles` for detection logic. The profile determines which patterns are appropriate:
-
-| Decision | Omakase | Service-Oriented | API-First |
-|----------|---------|-----------------|-----------|
-| Business logic home | Models + concerns | Service objects | Service/command objects |
-| Fat controller fix | Extract to concern/model | Extract to service | Extract to service |
-| Testing | Minitest + fixtures | RSpec + FactoryBot | RSpec + FactoryBot |
-| Auth | `has_secure_password` | Devise | JWT/token |
-| Job backend | Solid Queue | Sidekiq | Sidekiq or Solid Queue |
-
-## Core Design Principles
-
-| Principle | Meaning | Rails Example |
-|-----------|---------|---------------|
-| **CoC** | Convention over Configuration | Follow Rails naming, directory structure |
-| **DRY** | Don't Repeat Yourself | Extract concerns, shared partials, service objects |
-| **RESTful** | Resource-oriented routes | 7 standard actions per controller |
-| **Fat Model, Skinny Controller** | Business logic in models (omakase) or services (service-oriented) | Controllers only route + render |
-| **Least Surprise** | Code does what reader expects | Follow the project's own conventions |
-| **YAGNI** | Don't build what you don't need | Avoid premature abstraction |
-
-## Planning Framework
-
-When receiving a feature request:
-
-1. **Analyze scope** -- which layers of the stack are involved?
-2. **Identify models** -- what data entities and relationships are needed?
-3. **Plan order** -- Models -> Controllers -> Views/Services -> Tests
-4. **Choose patterns** -- service object? concern? background job?
-5. **Delegate** -- route to the appropriate domain skill/agent
-6. **Validate** -- review integration points between layers
 
 ## Quick Decision Matrix
 
 | Question | Option A | Option B | Choose A when | Choose B when |
 |----------|----------|----------|---------------|---------------|
-| Inheritance | STI | Polymorphic | Shared behavior + same columns | Different attributes per type |
-| Shared logic | Concern | Service Object | Omakase profile, or adds model capability | Service-oriented profile, or orchestrates a workflow |
+| Inheritance | STI | Polymorphic | >70% shared columns, same behavior | Different attributes per type |
+| Shared logic | Concern | Service Object | Omakase, or adds model capability | Service-oriented, or orchestrates workflow |
 | Background work | ActiveJob | Inline | > 100ms or external call | Fast + must be synchronous |
-| Job backend | Solid Queue | Sidekiq | Omakase profile, simple needs | Service-oriented/api-first, Redis already in stack |
+| Job backend | Solid Queue | Sidekiq | Omakase, simple needs | Redis already in stack |
 | API format | JSON:API | Custom JSON | Public API, many clients | Internal API, simple needs |
 | Frontend | Hotwire | SPA (React) | Content-heavy, progressive | Complex interactive UI |
-| Auth | `has_secure_password` | Devise | Omakase profile, simple needs | Service-oriented, standard multi-feature auth |
+| Auth | `has_secure_password` | Devise | Omakase, simple needs | Multi-feature auth needed |
 
 ## Implementation Order
 
-For a typical feature (e.g., "add product reviews"):
+For a typical feature:
 
 ```
 1. Migration + Model     (rails-model)
@@ -91,8 +69,6 @@ For a typical feature (e.g., "add product reviews"):
 
 ## Architecture Health Checks
 
-When reviewing an existing codebase, check (adapt to detected profile):
-
 **Universal (all profiles):**
 - [ ] No business logic in controllers or views
 - [ ] Controllers have 7 or fewer actions
@@ -101,18 +77,18 @@ When reviewing an existing codebase, check (adapt to detected profile):
 - [ ] Test coverage on critical paths
 - [ ] No circular dependencies between models
 
-**Omakase profile:**
+**Omakase:**
 - [ ] Models decomposed via concerns (not monolithic god models)
 - [ ] Callbacks are simple and predictable (data integrity, not workflows)
 - [ ] Using Rails defaults (Solid Queue, etc.) where possible
 
-**Service-oriented profile:**
+**Service-oriented:**
 - [ ] Models under 200 lines (extract services if larger)
 - [ ] All external API calls go through service objects
 - [ ] Service objects have single responsibility
 - [ ] Result pattern used consistently
 
-**API-first profile:**
+**API-first:**
 - [ ] All responses use serializers (never raw ActiveRecord)
 - [ ] API versioned from day one
 - [ ] Authentication is token-based
@@ -120,11 +96,10 @@ When reviewing an existing codebase, check (adapt to detected profile):
 
 ## Output Format
 
-When providing architectural guidance, use:
-
 ```
 ## Architecture Plan: [feature_name]
 
+**Detected Profile:** [omakase | service-oriented | api-first]
 **Layers Involved:** Models, Controllers, Services, Tests
 
 **Implementation Steps:**

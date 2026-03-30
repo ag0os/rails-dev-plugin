@@ -20,45 +20,33 @@ Analyze and recommend patterns for extracting and organizing business logic in R
 
 ## Supporting Documentation
 
-- [patterns.md](patterns.md) - Detailed service implementations and examples
+- [patterns.md](patterns.md) - Result objects, form objects, and profile-aware guidance
 
 ## Core Principles
 
-1. **Single responsibility**: One service, one operation (verb + noun naming)
-2. **One public method**: Expose `call` or `perform` only
-3. **Dependency injection**: Accept collaborators via constructor for testability
-4. **Explicit return values**: Use Result objects, not exceptions for flow control
-5. **Transaction boundaries**: Wrap multi-model changes in transactions
+1. **VerbNoun naming**: `CreateOrder`, `SendInvitation` -- never `OrderService` or `UserManager`
+2. **One public method**: Expose only `call` (or `perform`)
+3. **Explicit return values**: Use Result objects, never exceptions for expected flow control
+4. **Profile-aware extraction**: See "When to Extract" below
 
-## Basic Service Pattern
+## When to Extract a Service (Profile-Dependent)
 
-```ruby
-class CreateOrder
-  def initialize(user:, cart_items:, payment_method:)
-    @user = user
-    @cart_items = cart_items
-    @payment_method = payment_method
-  end
+| Scenario | Omakase | Service-Oriented / API-First |
+|----------|---------|------------------------------|
+| Logic on a single model's own data | Model method or concern | Model method |
+| Shared behavior across models | Concern | Concern |
+| Domain logic for one model | Concern | Service object |
+| Multi-model workflow with rollback | Model method + transaction | Service object |
+| External API call | Model method wrapping client | Service object |
+| Simple side effect (email, log) | Callback (`after_commit`) | Service object |
 
-  def call
-    ActiveRecord::Base.transaction do
-      order = @user.orders.create!(total: calculate_total, status: "pending")
-      create_line_items(order)
-      charge_payment(order)
-      OrderMailer.confirmation(order).deliver_later
-      order
-    end
-  end
+**Omakase:** Only extract to a service when the workflow genuinely spans multiple unrelated models or external systems. Prefer concerns and enriched model methods.
 
-  private
-
-  def calculate_total = @cart_items.sum(&:price)
-  def create_line_items(order) = # ...
-  def charge_payment(order) = # ...
-end
-```
+**Service-oriented / API-first:** Service objects are the default extraction target for any non-trivial business logic.
 
 ## Result Object Pattern
+
+Use `Struct.new(keyword_init: true)` for lightweight results. Never raise exceptions for expected failures (validation, auth, payment decline).
 
 ```ruby
 class AuthenticateUser
@@ -78,57 +66,9 @@ class AuthenticateUser
     end
   end
 end
-
-# Controller usage
-result = AuthenticateUser.new(email: params[:email], password: params[:password]).call
-if result.success?
-  sign_in(result.user)
-else
-  flash.now[:alert] = result.error
-  render :new, status: :unprocessable_entity
-end
 ```
 
-## Dependency Injection
-
-```ruby
-class NotificationService
-  def initialize(user:, mailer: UserMailer, sms: TwilioClient.new)
-    @user = user
-    @mailer = mailer
-    @sms = sms
-  end
-
-  def call(message)
-    @mailer.notification(@user, message).deliver_later
-    @sms.send_sms(@user.phone, message) if @user.sms_enabled?
-  end
-end
-
-# In tests: NotificationService.new(user: user, mailer: spy, sms: spy)
-```
-
-## External API Integration
-
-```ruby
-class WeatherService
-  class ApiError < StandardError; end
-
-  def initialize(api_key: Rails.application.credentials.weather_api_key, client: HTTParty)
-    @api_key = api_key
-    @client = client
-  end
-
-  def current_weather(city)
-    response = @client.get("https://api.weather.com/current/#{city}", query: { api_key: @api_key })
-    return Result.new(success?: true, data: parse(response)) if response.success?
-
-    Result.new(success?: false, error: "API returned #{response.code}")
-  rescue Net::OpenTimeout, Net::ReadTimeout => e
-    Result.new(success?: false, error: "Timeout: #{e.message}")
-  end
-end
-```
+See [patterns.md](patterns.md) for the enhanced monad-like `ServiceResult` with `on_success`/`on_failure` chaining.
 
 ## Anti-Patterns
 
@@ -136,26 +76,17 @@ end
 |-------------|---------|-----|
 | God service (100+ lines) | Does too much | Split into composable services |
 | Raising exceptions for flow control | Expensive, hard to handle | Use Result objects |
-| Service calling another service deeply | Hidden coupling, hard to debug | Orchestrate from controller or use a coordinator |
+| Deep service-calls-service chains | Hidden coupling | Orchestrate from controller or coordinator |
+| `self.call` class method pattern | No instance state, limits DI | Use instance methods with constructor DI |
 | No return value | Caller can't react to failures | Always return Result or meaningful value |
-| Injecting ActiveRecord classes | Hard to test, tight coupling | Inject instances or use DI defaults |
-| Class method services (`self.call`) | No instance state, limits DI | Use instance methods with constructor DI |
 | Service modifying passed-in objects | Surprising side effects | Return new objects or be explicit |
+| VerbNoun naming violation (`UserService`) | Unclear responsibility, attracts god service | One service = one operation = one verb |
 
 ## Output Format
 
 When analyzing or creating services, provide:
-1. **Service file** in `app/services/` with clear naming (VerbNoun)
+1. **Service file** in `app/services/` with VerbNoun naming
 2. **Result struct** if callers need success/failure status
 3. **Controller integration** showing how to call and handle results
 4. **Test outline** covering happy path, failure cases, and edge cases
-5. **Error handling** strategy (Result objects vs exceptions)
-
-## Error Handling
-
-- Use `ActiveRecord::Base.transaction` with `save!` / `create!` to auto-rollback on failure
-- Rescue specific exceptions, never bare `rescue`
-- Return Result objects for expected failures (validation, auth)
-- Raise exceptions for unexpected failures (network, system)
-- Log errors with context: `Rails.logger.error("[CreateOrder] Payment failed: #{e.message}")`
-- Define custom exception classes per domain: `class PaymentError < StandardError; end`
+5. **Error handling** strategy (Result objects for expected failures, exceptions for unexpected)

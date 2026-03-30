@@ -6,351 +6,114 @@ allowed-tools: Read, Grep, Glob
 
 # Ruby Refactoring Expert
 
-Systematic code improvement using principles from Ruby Science and established refactoring patterns.
-
-## When to Use This Skill
-
-- Reviewing recently written code for quality and maintainability
-- Identifying code smells in Ruby/Rails code
-- Planning refactoring strategy for complex classes or methods
-- Improving test coverage and structure
-- Analyzing code complexity and suggesting simplifications
-- Ensuring code follows Ruby idioms and Rails conventions
+Systematic code improvement using the Ruby Science methodology and Fowler's established refactoring catalog.
 
 ## Refactoring Methodology
 
-### 1. Identify Code Smells
+Follow this 5-step process strictly. Do not skip steps.
 
-Systematically scan for anti-patterns and problematic code structures. See [code-smells.md](code-smells.md) for complete catalog.
+### Step 1: Identify Code Smells
 
-**Common code smells**:
-- **Large Class**: Class > 100 lines or many instance variables
-- **Long Method**: Method > 10-15 lines or requires scrolling
-- **Long Parameter List**: Method takes > 3 parameters
-- **Feature Envy**: Method uses another object's data more than its own
-- **Data Clumps**: Same group of parameters appearing together
-- **Primitive Obsession**: Using primitives instead of objects
-- **Shotgun Surgery**: Change requires many small edits in many places
-- **Divergent Change**: Class changes for different reasons
+Systematically scan using the smell-to-pattern matrix below. See [code-smells.md](code-smells.md) for Rails-specific detection heuristics.
 
-### 2. Prioritize Issues
+### Step 2: Prioritize Issues
 
-Rank problems by impact on maintainability, performance, and business value.
+Rank every finding into one of three tiers:
 
-**Priority levels**:
-- **High**: Security issues, major maintainability problems, performance bottlenecks
-- **Medium**: Code complexity, duplication, testing gaps
-- **Low**: Style improvements, minor optimizations
+| Priority | Criteria | Examples |
+|----------|----------|---------|
+| **High** | Security risk, causes bugs across team, blocks feature work | N+1 in hot path, god class everyone edits, no test coverage on payment flow |
+| **Medium** | Slows development, increases onboarding time, causes merge conflicts | Duplicated logic across 3+ files, 200-line method, shotgun surgery across layers |
+| **Low** | Style inconsistency, minor readability, single-occurrence smell | One long parameter list, naming nitpick, unused private method |
 
-Focus on **high-impact, low-risk** refactorings first.
+Always attack **high-impact, low-risk** refactorings first. A refactoring is low-risk when existing tests cover the code path.
 
-### 3. Propose Solutions
+### Step 3: Propose Solutions
 
-For each issue, suggest specific refactoring patterns with concrete examples.
+Apply standard refactoring patterns from Fowler's catalog and Ruby Science. Use the decision matrix below to map smells to patterns. Do not re-explain patterns the developer already knows -- name the pattern, state why it fits, and show the proposed code.
 
-See [refactoring-patterns.md](refactoring-patterns.md) for complete pattern catalog.
+### Step 4: Consider Trade-offs
 
-### 4. Consider Trade-offs
+For every proposed refactoring, explicitly state:
+- Will this introduce indirection that hurts readability?
+- Is there measurable performance overhead?
+- Does this require touching test files? How many?
+- Could this be over-engineering for the current codebase size?
 
-Be pragmatic:
-- Will refactoring introduce complexity?
-- Is there performance overhead?
-- What's the benefit vs. cost?
-- Is this over-engineering?
+**Pragmatism rule**: Working, maintainable code the team understands beats theoretically perfect code.
 
-**Remember**: Perfect code is less important than working, maintainable code the team can understand.
+### Step 5: Verify Safety
 
-### 5. Ensure Test Coverage
+Before and after every refactoring:
+- Existing tests cover the code path (if not, write tests FIRST)
+- Refactor in small, independently verifiable steps
+- Run the test suite after each step
+- Business logic is unchanged unless explicitly intended
 
-Before refactoring:
-- ✅ Verify existing tests cover the code
-- ✅ Suggest additional tests for insufficient coverage
-- ✅ Ensure tests pass before and after refactoring
-- ✅ Refactor in small, verifiable steps
+## Smell-to-Pattern Decision Matrix
 
-## Quick Refactoring Reference
+| Smell | Primary Pattern | Secondary Pattern |
+|-------|----------------|-------------------|
+| Long Method (>10-15 lines) | Extract Method | Replace Method with Method Object (when many locals) |
+| Large Class (>100 lines) | Extract Class | Extract Module/Concern (for shared behavior) |
+| Long Parameter List (>3 params) | Introduce Parameter Object | Use keyword arguments |
+| Feature Envy | Move Method | Extract + delegate |
+| Primitive Obsession | Extract Value Object | Use Rails enum for states |
+| Complex Conditional on type | Replace Conditional with Polymorphism | Strategy pattern (when STI is overkill) |
+| Duplicated Code (2+ places) | Extract Method or Module | Extract shared concern |
+| Data Clumps | Extract Class | Introduce Parameter Object |
+| Shotgun Surgery | Move Method / Inline Class | See [code-smells.md](code-smells.md) for Rails multi-layer detection |
+| Divergent Change | Extract Class | Split by axis of change |
 
-### Extract Method
+## Rails-Specific Guidance
 
-**When**: Method > 10-15 lines or does multiple things
+These smells manifest differently in Rails apps than in plain Ruby. See [code-smells.md](code-smells.md) for details on:
 
-```ruby
-# Before
-def calculate_total
-  subtotal = line_items.sum(&:amount)
-  tax = subtotal * tax_rate
-  shipping = calculate_shipping(subtotal)
-  subtotal + tax + shipping
-end
+- **Feature Envy in models**: Methods that chain through associations to access data (e.g., `policy.person.address.zip_code`) -- push logic to the owning model or use `delegate`
+- **Shotgun Surgery across Rails layers**: A single business rule change touching model, controller, view, serializer, and test -- consolidate into one domain object
+- **God models**: ActiveRecord models that accumulate callbacks, validations, scopes, and business logic for unrelated features -- extract concerns or service objects
 
-# After
-def calculate_total
-  subtotal + tax + shipping_cost
-end
-
-private
-
-def subtotal
-  line_items.sum(&:amount)
-end
-
-def tax
-  subtotal * tax_rate
-end
-
-def shipping_cost
-  calculate_shipping(subtotal)
-end
-```
-
-### Extract Class
-
-**When**: Class > 100 lines or has multiple responsibilities
-
-```ruby
-# Before: User class handling authentication AND profile management
-class User < ApplicationRecord
-  def authenticate(password)
-    # Authentication logic
-  end
-
-  def update_profile(params)
-    # Profile logic
-  end
-
-  def send_welcome_email
-    # Email logic
-  end
-end
-
-# After: Separated concerns
-class User < ApplicationRecord
-  has_one :user_profile
-
-  def authenticate(password)
-    # Authentication only
-  end
-end
-
-class UserProfile < ApplicationRecord
-  belongs_to :user
-
-  def update(params)
-    # Profile management
-  end
-end
-
-class UserNotifier
-  def self.send_welcome(user)
-    # Email logic
-  end
-end
-```
-
-### Extract Service Object
-
-**When**: Logic spans multiple models or has complex orchestration
-
-```ruby
-# Before: Fat controller or model method
-class PolicyRenewalService
-  def initialize(policy, new_expiry_date)
-    @policy = policy
-    @new_expiry_date = new_expiry_date
-  end
-
-  def call
-    return failure("Not renewable") unless @policy.renewable?
-
-    ApplicationRecord.transaction do
-      archive_old_policy
-      update_policy
-      create_invoice
-      send_notifications
-    end
-
-    success(@policy)
-  rescue StandardError => e
-    failure(e.message)
-  end
-end
-```
-
-### Replace Conditional with Polymorphism
-
-**When**: Complex conditionals based on type
-
-```ruby
-# Before: Type checking
-def calculate_premium
-  case insurance_type
-  when 'auto'
-    base_rate * vehicle_factor * driver_age_factor
-  when 'home'
-    base_rate * property_value_factor * location_risk
-  when 'life'
-    base_rate * age_factor * health_factor
-  end
-end
-
-# After: Polymorphism
-class AutoInsurancePolicy < Insurance::Policy
-  def calculate_premium
-    base_rate * vehicle_factor * driver_age_factor
-  end
-end
-
-class HomeInsurancePolicy < Insurance::Policy
-  def calculate_premium
-    base_rate * property_value_factor * location_risk
-  end
-end
-```
-
-### Introduce Parameter Object
-
-**When**: Method has > 3 parameters or parameter groups appear together
-
-```ruby
-# Before
-def create_policy(policy_number, effective_date, expiry_date, premium, person_id, company_id)
-  # ...
-end
-
-# After
-class PolicyAttributes
-  attr_reader :policy_number, :effective_date, :expiry_date,
-              :premium, :person_id, :company_id
-
-  def initialize(params)
-    @policy_number = params[:policy_number]
-    @effective_date = params[:effective_date]
-    # ...
-  end
-
-  def valid?
-    # Validation logic
-  end
-end
-
-def create_policy(attributes)
-  return unless attributes.valid?
-  # ...
-end
-```
-
-## Ruby and Rails Best Practices
-
-### Ruby Idioms
-
-**Use blocks and enumerables**:
-```ruby
-# ✅ Good
-users.select(&:active?).map(&:email)
-
-# ❌ Bad
-result = []
-users.each do |user|
-  result << user.email if user.active?
-end
-```
-
-**Use symbols for keys**:
-```ruby
-# ✅ Good
-{ name: 'John', age: 30 }
-
-# ❌ Bad
-{ 'name' => 'John', 'age' => 30 }
-```
-
-### Rails Conventions
-
-**Skinny controllers, focused models**:
-- Controllers: HTTP handling, authorization
-- Models: Domain logic, associations
-- Services: Multi-model operations
-
-**Use scopes for queries**:
-```ruby
-# ✅ Good
-class Policy < ApplicationRecord
-  scope :active, -> { where(status: 'active') }
-  scope :expiring_soon, -> { where('expiry_date < ?', 30.days.from_now) }
-end
-
-# ❌ Bad
-def self.active_policies
-  where(status: 'active')
-end
-```
-
-### SOLID Principles
-
-- **Single Responsibility**: One class = one reason to change
-- **Open/Closed**: Open for extension, closed for modification
-- **Liskov Substitution**: Subclasses should be substitutable
-- **Interface Segregation**: Many specific interfaces > one general
-- **Dependency Inversion**: Depend on abstractions, not concretions
+**Profile-aware refactoring targets:**
+- **Omakase**: Extract to concern or model method
+- **Service-oriented**: Extract to service object or PORO
+- **API-first**: Extract to serializer, policy, or form object
 
 ## Output Format
 
-When providing refactoring recommendations:
+Structure every refactoring recommendation as:
 
 ### 1. Code Smell Analysis
-List identified issues with severity (High/Medium/Low) and location
+List each smell with severity (High/Medium/Low), file path, and line range.
 
 ### 2. Refactoring Plan
-Prioritized list of refactoring steps
+Ordered list of refactoring steps. High-priority first. Each step names the specific pattern.
 
-### 3. Implementation Examples
-Concrete before/after code samples
+### 3. Implementation
+Before/after code for each change. Show only the transformed code -- do not re-explain what Extract Method means.
 
 ### 4. Test Considerations
-Required test changes or additions
+New tests needed, existing tests that must change, and suggested test run order.
 
 ### 5. Migration Strategy
-How to safely deploy changes
+How to safely deploy: feature flags, incremental PRs, or backward-compatible steps.
 
 ## Quality Checks
 
-Before finalizing recommendations:
-
-- ✅ All tests still pass
-- ✅ No performance regressions
-- ✅ Code complexity improves (ABC score, cyclomatic complexity)
-- ✅ Code is more readable and maintainable
-- ✅ Business logic unchanged (unless explicitly intended)
-
-## Related Documentation
-
-- [code-smells.md](code-smells.md) - Complete code smell catalog
-- [refactoring-patterns.md](refactoring-patterns.md) - Detailed refactoring patterns
-
-## Quick Decision Matrix
-
-| Smell | Pattern | When to Use |
-|-------|---------|-------------|
-| Long Method | Extract Method | Method > 10-15 lines |
-| Large Class | Extract Class | Class > 100 lines |
-| Long Parameter List | Parameter Object | > 3 parameters |
-| Feature Envy | Move Method | Uses other object's data |
-| Primitive Obsession | Extract Value Object | Primitives with behavior |
-| Complex Conditional | Polymorphism | Type-based conditionals |
-| Duplicated Code | Extract Method/Module | Same code in 2+ places |
+Before finalizing any recommendation, verify:
+- All tests still pass
+- No N+1 queries introduced
+- ABC/cyclomatic complexity improves (cite metric if available)
+- Code is more readable to a new team member
+- Business logic is unchanged
 
 ## Communication Style
 
-- Use clear, technical language for experienced developers
-- Provide concrete examples over abstractions
-- Reference Ruby Science principles by name
-- Include links to documentation when relevant
-- Be decisive but explain reasoning
+- Be decisive: recommend one approach, not three options
+- Name Ruby Science / Fowler patterns explicitly so developers can look them up
+- Skip explanations of standard patterns -- name them and show the code
+- Ask questions when uncertain about: business requirements, team conventions, performance constraints, or existing technical debt strategy
 
-**Ask questions** when uncertain about:
-- Business requirements
-- Existing constraints
-- Team preferences
-- Performance requirements
+## Related Documentation
 
-Remember: The goal is **maintainable code** that the team understands, not perfect code.
+- [code-smells.md](code-smells.md) - Rails-specific detection heuristics
+- [refactoring-patterns.md](refactoring-patterns.md) - Pattern selection guidance for ambiguous cases

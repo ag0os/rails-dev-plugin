@@ -8,135 +8,40 @@ allowed-tools: Read, Grep, Glob
 
 Analyze and recommend best practices for Rails API design including controllers, serialization, authentication, versioning, and error handling.
 
-See [patterns.md](patterns.md) for full code examples.
+Follow standard Rails API controller conventions (`ActionController::API`, strong parameters, `rescue_from`). See [patterns.md](patterns.md) for opinionated decisions and configuration.
 
 ## Quick Reference
 
-| Area | Pattern | Key File |
-|------|---------|----------|
+| Area | Decision | Key File |
+|------|----------|----------|
 | Base controller | `ActionController::API` + shared concerns | `app/controllers/api/base_controller.rb` |
-| Versioning | URL namespace (`/api/v1/`) | `config/routes.rb` |
-| Auth | JWT bearer token | `app/controllers/concerns/authenticatable.rb` |
-| Serialization | ActiveModel::Serializer or Blueprinter | `app/serializers/` |
-| Errors | Consistent JSON envelope | `rescue_from` in base controller |
-| Pagination | Kaminari or Pagy + meta object | Controller `index` actions |
-| Rate limiting | Rack::Attack per token/IP | `config/initializers/rack_attack.rb` |
+| Versioning | URL namespace (`/api/v1/`) -- NOT header-based | `config/routes.rb` |
+| Auth | JWT bearer token via `JwtService` | `app/controllers/concerns/authenticatable.rb` |
+| Serialization | Blueprinter preferred (views for complexity) | `app/blueprints/` |
+| Response format | `{ data:, meta:, errors: }` envelope always | All API responses |
+| Pagination | Pagy or Kaminari + `max_per_page: 100` cap | `app/controllers/concerns/paginatable.rb` |
+| Rate limiting | Rack::Attack: 100/min per token, 20/min per IP | `config/initializers/rack_attack.rb` |
+| CORS | `rack-cors` gem, env-driven origins | `config/initializers/cors.rb` |
 
-## Core Principles
+## Core Decisions
 
-1. **Consistent response envelope** -- always wrap in `{ data:, meta:, errors: }`
-2. **Proper HTTP status codes** -- 200, 201, 204, 400, 401, 403, 404, 422, 429, 500
-3. **Versioned from day one** -- `/api/v1/` namespace even for first version
-4. **Authenticate every request** -- `before_action :authenticate` in base controller
-5. **Paginate all collections** -- never return unbounded lists
-6. **Prevent N+1 queries** -- eager load associations in controller
-
-## Key Patterns
-
-### Base API Controller
-
-```ruby
-class Api::BaseController < ActionController::API
-  include ActionController::HttpAuthentication::Token::ControllerMethods
-
-  before_action :authenticate
-
-  rescue_from ActiveRecord::RecordNotFound,    with: :not_found
-  rescue_from ActiveRecord::RecordInvalid,     with: :unprocessable_entity
-  rescue_from ActionController::ParameterMissing, with: :bad_request
-
-  private
-
-  def authenticate
-    authenticate_or_request_with_http_token do |token, _options|
-      @current_user = User.find_by(api_token: token)
-    end
-  end
-
-  def not_found(exception)
-    render json: { error: exception.message }, status: :not_found
-  end
-
-  def unprocessable_entity(exception)
-    render json: { errors: exception.record.errors }, status: :unprocessable_entity
-  end
-
-  def bad_request(exception)
-    render json: { error: exception.message }, status: :bad_request
-  end
-end
-```
-
-### RESTful Resource Controller
-
-```ruby
-class Api::V1::ProductsController < Api::BaseController
-  def index
-    products = Product.includes(:category).page(params[:page]).per(params[:per_page])
-    render json: { data: products, meta: pagination_meta(products) }
-  end
-
-  def show
-    render json: { data: Product.find(params[:id]) }
-  end
-
-  def create
-    product = Product.new(product_params)
-    if product.save
-      render json: { data: product }, status: :created
-    else
-      render json: { errors: product.errors }, status: :unprocessable_entity
-    end
-  end
-
-  private
-
-  def product_params
-    params.expect(product: [:name, :price, :description, :category_id])
-  end
-end
-```
-
-### JSON Response Envelope
-
-```json
-{
-  "data": { "id": "123", "type": "products", "attributes": { "name": "Widget" } },
-  "meta": { "total": 100, "page": 1, "per_page": 20 }
-}
-```
-
-### Error Response
-
-```json
-{
-  "error": "Record not found",
-  "errors": { "name": ["can't be blank"] }
-}
-```
+1. **Response envelope always** -- every response wraps in `{ data:, meta:, errors: }`, never bare objects/arrays
+2. **URL versioning from day one** -- `/api/v1/` namespace even for first version; header-based versioning adds complexity without benefit for most apps
+3. **Blueprinter over AMS** -- ActiveModel::Serializer is unmaintained; prefer Blueprinter for views-based serialization, or Jbuilder for complex one-offs
+4. **Cap per_page at 100** -- enforce `[params[:per_page].to_i, 100].min` to prevent clients from requesting unbounded results
+5. **Authenticate in base, skip explicitly** -- `before_action :authenticate` in `Api::BaseController`, use `skip_before_action` for public endpoints
+6. **Dual rate limits** -- per-token (100/min) for authenticated, per-IP (20/min) for unauthenticated; return `Retry-After` header
 
 ## Anti-Patterns
 
 | Bad | Good | Why |
 |-----|------|-----|
-| Render ActiveRecord objects directly | Use serializers | Controls exposed fields |
-| No pagination on `index` | Always paginate | Memory + performance |
-| Generic 500 for all errors | Specific status codes | Client error handling |
-| Auth logic in every controller | Shared concern / base class | DRY |
-| Version in header only | URL versioning (`/api/v1/`) | Simpler routing, caching |
-| N+1 queries in serializers | `includes()` in controller | Performance |
-
-## Versioning Strategy
-
-```ruby
-# config/routes.rb
-namespace :api do
-  namespace :v1 do
-    resources :products, only: [:index, :show, :create, :update, :destroy]
-    resource :auth, only: [:create], controller: "auth"
-  end
-end
-```
+| Render ActiveRecord objects directly | Use serializers/blueprints | Controls exposed fields, prevents leaking columns |
+| No pagination on `index` | Always paginate with max cap | Memory + performance, prevents client abuse |
+| Version in header only | URL versioning (`/api/v1/`) | Simpler routing, cacheable, easier debugging |
+| N+1 queries in serializers | `includes()` in controller | Serializers should not trigger queries |
+| Bare error strings | Structured `{ error:, errors: }` envelope | Clients need machine-parseable error format |
+| CORS `origins "*"` in production | Env-driven origin allowlist | Security; wildcard disables credential sharing |
 
 ## Output Format
 

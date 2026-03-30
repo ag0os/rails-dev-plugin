@@ -1,123 +1,59 @@
 # Action Mailer Patterns — Detailed Reference
 
-## Delivery Configuration
+Follow standard Rails conventions for basic mailer structure, SMTP configuration, multipart templates, attachments, I18n subjects, and `letter_opener` in development. This file covers opinionated and non-obvious patterns.
 
-### Production (common providers)
+## Parameterized Mailers with `before_action`
 
-```ruby
-# config/environments/production.rb
-
-# SMTP (SendGrid, Postmark, Mailgun)
-config.action_mailer.delivery_method = :smtp
-config.action_mailer.smtp_settings = {
-  address: "smtp.sendgrid.net",
-  port: 587,
-  user_name: "apikey",
-  password: Rails.application.credentials.dig(:sendgrid, :api_key),
-  authentication: :plain,
-  enable_starttls_auto: true
-}
-
-# Default URL for links in emails
-config.action_mailer.default_url_options = { host: "example.com", protocol: "https" }
-config.action_mailer.asset_host = "https://example.com"
-```
-
-### Development
+The key pattern: use `params` and `before_action` to share context across methods without repeating arguments.
 
 ```ruby
-# config/environments/development.rb
-config.action_mailer.delivery_method = :letter_opener # gem "letter_opener"
-config.action_mailer.default_url_options = { host: "localhost", port: 3000 }
-config.action_mailer.raise_delivery_errors = true
-config.action_mailer.perform_deliveries = true
+class UserMailer < ApplicationMailer
+  before_action { @user = params[:user] }
+  before_action { @account = params[:user].account }
+
+  default to: -> { @user.email }
+
+  def welcome
+    mail(subject: "Welcome to #{@account.name}")
+  end
+
+  def weekly_digest
+    @events = @user.events.from_last_week
+    mail(subject: "Your weekly digest")
+  end
+end
+
+# Usage — always with(params).method
+UserMailer.with(user: user).welcome.deliver_later
 ```
 
-### Test
+## ApplicationMailer with Dynamic From and Error Handling
 
 ```ruby
-# config/environments/test.rb
-config.action_mailer.delivery_method = :test
-config.action_mailer.default_url_options = { host: "localhost", port: 3000 }
-```
+class ApplicationMailer < ActionMailer::Base
+  default from: -> { "#{Current.account&.name || 'App'} <noreply@example.com>" }
+  layout "mailer"
 
-## Multipart Emails (HTML + Text)
+  rescue_from Net::SMTPSyntaxError, with: :log_delivery_error
 
-Always provide both HTML and text versions:
+  before_action :set_default_headers
 
-```erb
-<%# app/views/order_mailer/confirmation.html.erb %>
-<h1>Order Confirmed</h1>
-<p>Hi <%= @user.name %>,</p>
-<p>Your order <strong>#<%= @order.number %></strong> has been confirmed.</p>
-<%= link_to "View Order", order_url(@order) %>
-```
+  private
 
-```erb
-<%# app/views/order_mailer/confirmation.text.erb %>
-Order Confirmed
+  def set_default_headers
+    headers["X-App-Version"] = Rails.application.config.version
+    headers["List-Unsubscribe"] = "<mailto:unsubscribe@example.com>"
+  end
 
-Hi <%= @user.name %>,
-
-Your order #<%= @order.number %> has been confirmed.
-
-View Order: <%= order_url(@order) %>
-```
-
-## Mailer Layout
-
-```erb
-<%# app/views/layouts/mailer.html.erb %>
-<!DOCTYPE html>
-<html>
-<head>
-  <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .footer { margin-top: 30px; font-size: 12px; color: #666; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <%= yield %>
-    <div class="footer">
-      <p>&copy; <%= Date.current.year %> <%= @account&.name || "App" %></p>
-      <%= link_to "Unsubscribe", unsubscribe_url(token: @user&.unsubscribe_token) %>
-    </div>
-  </div>
-</body>
-</html>
-```
-
-## Attachments
-
-```ruby
-class InvoiceMailer < ApplicationMailer
-  def send_invoice(invoice)
-    @invoice = invoice
-
-    # File attachment
-    attachments["invoice_#{invoice.number}.pdf"] = invoice.generate_pdf
-
-    # Inline attachment (for embedded images)
-    attachments.inline["logo.png"] = File.read(Rails.root.join("app/assets/images/logo.png"))
-
-    mail(to: invoice.user.email, subject: "Invoice ##{invoice.number}")
+  def log_delivery_error(exception)
+    Rails.logger.error("[Mailer] Delivery failed: #{exception.message}")
   end
 end
 ```
 
-```erb
-<%# Reference inline attachment in template %>
-<%= image_tag attachments["logo.png"].url %>
-```
+## Staging Email Interceptor
 
-## Interceptors and Observers
-
-### Staging Email Redirect
-
-Prevent sending real emails in staging:
+Prevents real emails in staging by redirecting all mail:
 
 ```ruby
 # app/mailers/interceptors/staging_interceptor.rb
@@ -136,7 +72,7 @@ if Rails.env.staging?
 end
 ```
 
-### Delivery Observer (logging, tracking)
+## Delivery Observer (Logging/Tracking)
 
 ```ruby
 class DeliveryObserver
@@ -152,47 +88,43 @@ end
 ActionMailer::Base.register_observer(DeliveryObserver)
 ```
 
-## Conditional Delivery
+## Previews with Multiple Scenarios
+
+```ruby
+class OrderMailerPreview < ActionMailer::Preview
+  def confirmation
+    OrderMailer.confirmation(Order.first)
+  end
+
+  def confirmation_with_discount
+    order = Order.joins(:discount).first
+    OrderMailer.confirmation(order)
+  end
+
+  def confirmation_international
+    order = Order.joins(:user).where(users: { locale: "ja" }).first
+    OrderMailer.confirmation(order)
+  end
+end
+```
+
+## Conditional Delivery (Skip Empty)
 
 ```ruby
 class NotificationMailer < ApplicationMailer
   def activity_digest(user)
     @user = user
     @activities = user.activities.from_last_day
-
-    # Don't send empty digests
-    return if @activities.none?
+    return if @activities.none?  # Returning nil skips delivery entirely
 
     mail(to: @user.email, subject: "Your daily activity")
   end
 end
 ```
 
-**Note:** Returning `nil` from a mailer method skips delivery entirely.
+## Profile-Aware Delivery Triggers
 
-## Callbacks
-
-```ruby
-class ApplicationMailer < ActionMailer::Base
-  before_action :set_default_headers
-  after_action :log_delivery
-
-  private
-
-  def set_default_headers
-    headers["X-App-Version"] = Rails.application.config.version
-    headers["List-Unsubscribe"] = "<mailto:unsubscribe@example.com>"
-  end
-
-  def log_delivery
-    Rails.logger.info("[Mailer] Preparing: #{self.class}##{action_name} to #{message.to}")
-  end
-end
-```
-
-## Mailer with Background Job Integration
-
-**Omakase — model triggers delivery:**
+**Omakase — model callback triggers delivery (uses `_later`/`_now` convention):**
 
 ```ruby
 class Order < ApplicationRecord
@@ -225,79 +157,31 @@ class ApplicationMailer < ActionMailer::Base
   self.deliver_later_queue_name = :mailers
 end
 
-# Or per mailer
 class UrgentMailer < ApplicationMailer
   self.deliver_later_queue_name = :critical
 end
 ```
 
-## I18n in Emails
+## Profile-Aware Testing
 
-```yaml
-# config/locales/en.yml
-en:
-  order_mailer:
-    confirmation:
-      subject: "Order #%{number} confirmed"
-    shipped:
-      subject: "Your order has shipped!"
-```
+**Omakase — Minitest:**
 
 ```ruby
-class OrderMailer < ApplicationMailer
-  def confirmation(order)
-    @order = order
-    mail(
-      to: order.user.email,
-      subject: default_i18n_subject(number: order.number)
-    )
-  end
-end
-```
+class OrderMailerTest < ActionMailer::TestCase
+  test "confirmation email" do
+    order = orders(:confirmed)
+    email = OrderMailer.confirmation(order)
 
-## Previews with Different Scenarios
-
-```ruby
-class OrderMailerPreview < ActionMailer::Preview
-  def confirmation
-    OrderMailer.confirmation(Order.first)
-  end
-
-  def confirmation_with_discount
-    order = Order.joins(:discount).first
-    OrderMailer.confirmation(order)
-  end
-
-  def confirmation_international
-    order = Order.joins(:user).where(users: { locale: "ja" }).first
-    OrderMailer.confirmation(order)
-  end
-end
-```
-
-## Testing Delivery in Integration Tests
-
-**Omakase:**
-
-```ruby
-class OrdersControllerTest < ActionDispatch::IntegrationTest
-  test "creating order sends confirmation email" do
     assert_emails 1 do
-      post orders_url, params: { order: { product_id: products(:widget).id } }
+      email.deliver_now
     end
-  end
-
-  test "confirmation email has correct content" do
-    post orders_url, params: { order: { product_id: products(:widget).id } }
-
-    email = ActionMailer::Base.deliveries.last
-    assert_equal [users(:jane).email], email.to
-    assert_match /confirmed/i, email.subject
+    assert_equal [order.user.email], email.to
+    assert_match "Order ##{order.number}", email.subject
   end
 end
 ```
 
-**Service-oriented:**
+**Service-oriented — RSpec with `have_enqueued_mail`:**
 
 ```ruby
 RSpec.describe "Order creation", type: :request do
@@ -307,37 +191,4 @@ RSpec.describe "Order creation", type: :request do
     }.to have_enqueued_mail(OrderMailer, :confirmation)
   end
 end
-```
-
-## Directory Organization
-
-```
-app/
-  mailers/
-    application_mailer.rb
-    order_mailer.rb
-    user_mailer.rb
-    notification_mailer.rb
-    interceptors/              # Custom interceptors
-      staging_interceptor.rb
-  views/
-    layouts/
-      mailer.html.erb          # Shared HTML layout
-      mailer.text.erb          # Shared text layout
-    order_mailer/
-      confirmation.html.erb
-      confirmation.text.erb
-      shipped.html.erb
-      shipped.text.erb
-    user_mailer/
-      welcome.html.erb
-      welcome.text.erb
-test/mailers/                  # Omakase
-  order_mailer_test.rb
-  previews/
-    order_mailer_preview.rb
-spec/mailers/                  # Service-oriented
-  order_mailer_spec.rb
-  previews/
-    order_mailer_preview.rb
 ```

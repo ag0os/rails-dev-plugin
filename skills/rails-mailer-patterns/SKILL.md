@@ -8,49 +8,27 @@ allowed-tools: Read, Grep, Glob
 
 Analyze and recommend Action Mailer patterns for reliable, well-structured email delivery in Rails applications.
 
+Follow standard Rails conventions for basic mailer structure, `mail()` calls, delivery configuration, multipart templates, attachments, and I18n subjects. Focus on the opinionated patterns below.
+
 See [patterns.md](patterns.md) for detailed code examples.
 
 ## Quick Reference
 
-| Pattern | Use When | Example |
-|---------|----------|---------|
-| `deliver_later` | Default for all emails | `UserMailer.welcome(user).deliver_later` |
-| `deliver_now` | Must send immediately (e.g., password reset in test) | `UserMailer.reset(user).deliver_now` |
-| Parameterized mailer | Shared context across methods | `UserMailer.with(user: user).welcome` |
-| Mailer preview | Visual email testing | `test/mailers/previews/` or `spec/mailers/previews/` |
-| Interceptor | Modify all outgoing email (staging redirect) | `register_interceptor(StagingInterceptor)` |
+| Pattern | Use When |
+|---------|----------|
+| Parameterized mailer with `before_action` | Shared context across multiple mailer methods |
+| Mailer preview per method | Every mailer method needs a preview — catches layout issues CI cannot |
+| Staging interceptor | Prevent real emails in non-production environments |
+| `_later`/`_now` convention | Model triggers delivery; mailer is just the template layer |
+| Profile-aware testing | Minitest (omakase) vs RSpec (service-oriented) |
 
 ## Core Principles
 
-1. **Always `deliver_later`**: Email delivery is I/O — send via background job by default
-2. **Mailers are views, not logic**: Mailer methods assemble data and call `mail()`. No business logic
-3. **One email per method**: Each mailer method sends one email. No conditionals choosing between templates
-4. **Preview every email**: Use mailer previews for visual verification — they catch layout issues CI can't
-5. **Test content, not delivery**: Assert email content and recipients; trust Rails for delivery mechanics
-
-## Mailer Structure Template
-
-```ruby
-class OrderMailer < ApplicationMailer
-  def confirmation(order)
-    @order = order
-    @user = order.user
-
-    mail(
-      to: @user.email,
-      subject: "Order ##{@order.number} confirmed"
-    )
-  end
-
-  def shipped(order)
-    @order = order
-    @tracking_url = order.tracking_url
-
-    mail(to: order.user.email)
-    # Subject from: app/views/order_mailer/shipped.en.yml
-  end
-end
-```
+1. **Always `deliver_later`**: Email delivery is I/O — background job by default
+2. **Mailers are views, not logic**: Assemble data and call `mail()`. No business logic
+3. **One email per method**: No conditionals choosing between templates
+4. **Preview every email**: Mailer previews catch layout issues CI cannot
+5. **`_later`/`_now` on the model**: The model defines when to send; the mailer defines what to send
 
 ## Parameterized Mailers
 
@@ -77,14 +55,13 @@ end
 UserMailer.with(user: user).welcome.deliver_later
 ```
 
-## Application Mailer Base
+## ApplicationMailer with Dynamic From
 
 ```ruby
 class ApplicationMailer < ActionMailer::Base
   default from: -> { "#{Current.account&.name || 'App'} <noreply@example.com>" }
   layout "mailer"
 
-  # Omakase: rescue delivery errors in mailer
   rescue_from Net::SMTPSyntaxError, with: :log_delivery_error
 
   private
@@ -95,26 +72,75 @@ class ApplicationMailer < ActionMailer::Base
 end
 ```
 
+## Staging Email Interceptor
+
+Prevent sending real emails in staging — redirects all mail to a safe inbox:
+
+```ruby
+# app/mailers/interceptors/staging_interceptor.rb
+class StagingInterceptor
+  def self.delivering_email(message)
+    message.to = ["staging-inbox@example.com"]
+    message.cc = nil
+    message.bcc = nil
+    message.subject = "[STAGING] #{message.subject} (was: #{message.to})"
+  end
+end
+
+# config/initializers/mail_interceptors.rb
+if Rails.env.staging?
+  ActionMailer::Base.register_interceptor(StagingInterceptor)
+end
+```
+
 ## Previews
 
 ```ruby
-# test/mailers/previews/order_mailer_preview.rb (Omakase)
-# spec/mailers/previews/order_mailer_preview.rb (Service-oriented)
+# test/mailers/previews/order_mailer_preview.rb  (Omakase)
+# spec/mailers/previews/order_mailer_preview.rb   (Service-oriented)
 class OrderMailerPreview < ActionMailer::Preview
   def confirmation
-    order = Order.first || FactoryBot.build(:order) # Adapt to profile
+    order = Order.first || FactoryBot.build(:order)
     OrderMailer.confirmation(order)
   end
 
-  def shipped
-    order = Order.where.not(shipped_at: nil).first
-    OrderMailer.shipped(order)
+  def confirmation_with_discount
+    order = Order.joins(:discount).first
+    OrderMailer.confirmation(order)
   end
 end
 # Visit: http://localhost:3000/rails/mailers/order_mailer/confirmation
 ```
 
-## Testing
+## Profile-Aware Delivery Triggers
+
+**Omakase — model triggers delivery:**
+
+```ruby
+class Order < ApplicationRecord
+  after_create_commit :send_confirmation
+
+  private
+
+  def send_confirmation
+    OrderMailer.confirmation(self).deliver_later
+  end
+end
+```
+
+**Service-oriented — service triggers delivery:**
+
+```ruby
+class Orders::Create
+  def call
+    order = Order.create!(params)
+    OrderMailer.confirmation(order).deliver_later
+    Result.new(success: true, order: order)
+  end
+end
+```
+
+## Profile-Aware Testing
 
 **Omakase — Minitest:**
 
@@ -127,7 +153,6 @@ class OrderMailerTest < ActionMailer::TestCase
     assert_emails 1 do
       email.deliver_now
     end
-    assert_equal ["noreply@example.com"], email.from
     assert_equal [order.user.email], email.to
     assert_match "Order ##{order.number}", email.subject
   end
@@ -156,14 +181,13 @@ end
 
 ## Anti-Patterns
 
-| Anti-Pattern | Problem | Fix |
-|-------------|---------|-----|
-| `deliver_now` in controllers | Blocks request, slow response | Use `deliver_later` |
-| Business logic in mailers | Wrong layer, hard to test | Move to model/service, pass data to mailer |
-| Conditional templates in one method | Hard to test and preview | One method per email |
-| No previews | Layout bugs found in production | Add preview for every mailer method |
-| Hardcoded from address | Can't change per environment | Use `default from:` in ApplicationMailer |
-| HTML-only emails | Spam filters, accessibility | Always include text part |
+| Anti-Pattern | Fix |
+|-------------|-----|
+| `deliver_now` in controllers | Use `deliver_later` — email is I/O |
+| Business logic in mailers | Move to model/service, pass data to mailer |
+| Conditional templates in one method | One method per email |
+| No previews | Add preview for every mailer method |
+| HTML-only emails | Always include text part |
 
 ## Output Format
 

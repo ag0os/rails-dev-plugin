@@ -1,157 +1,32 @@
 # ActiveRecord Validation Patterns
 
-Patterns for implementing model validations in Rails.
+Generate standard Rails validations (presence, uniqueness, format, length, numericality, inclusion, conditional) following Rails conventions. This document covers strategy decisions and non-obvious patterns.
 
-## Built-in Validators
+## Core Rule: Always Pair with Database Constraints
 
-### Presence
+Every critical validation must have a matching database constraint:
 
-```ruby
-validates :name, presence: true
-validates :email, presence: { message: "is required" }
+| Validation | DB Constraint |
+|-----------|---------------|
+| `presence: true` | `null: false` |
+| `uniqueness: true` | `add_index ..., unique: true` |
+| `numericality: { greater_than: 0 }` | `add_check_constraint` (PostgreSQL) |
+| `inclusion: { in: [...] }` | `create_enum` or `add_check_constraint` |
 
-# For associations
-validates :user, presence: true  # Validates associated object exists
-```
+Uniqueness validations are race-condition-prone without a unique index.
 
-### Uniqueness
+## Custom Validator Classes
 
-```ruby
-validates :email, uniqueness: true
-validates :email, uniqueness: { case_sensitive: false }
-validates :slug, uniqueness: { scope: :category_id }
-validates :email, uniqueness: {
-  scope: :account_id,
-  message: "is already registered for this account"
-}
-```
-
-**Important:** Always add a database unique index:
-```ruby
-add_index :users, :email, unique: true
-add_index :posts, [:slug, :category_id], unique: true
-```
-
-### Format
-
-```ruby
-validates :email, format: { with: URI::MailTo::EMAIL_REGEXP }
-validates :phone, format: {
-  with: /\A\d{10}\z/,
-  message: "must be 10 digits"
-}
-validates :username, format: {
-  with: /\A[a-z0-9_]+\z/,
-  message: "can only contain lowercase letters, numbers, and underscores"
-}
-```
-
-### Length
-
-```ruby
-validates :name, length: { minimum: 2 }
-validates :bio, length: { maximum: 500 }
-validates :password, length: { in: 8..128 }
-validates :pin, length: { is: 4 }
-validates :summary, length: {
-  maximum: 200,
-  too_long: "%{count} characters is the maximum"
-}
-```
-
-### Numericality
-
-```ruby
-validates :age, numericality: { only_integer: true }
-validates :price, numericality: { greater_than: 0 }
-validates :quantity, numericality: {
-  only_integer: true,
-  greater_than_or_equal_to: 0
-}
-validates :discount, numericality: {
-  greater_than_or_equal_to: 0,
-  less_than_or_equal_to: 100
-}
-```
-
-### Inclusion/Exclusion
-
-```ruby
-STATUSES = %w[pending active archived].freeze
-validates :status, inclusion: { in: STATUSES }
-
-validates :subdomain, exclusion: {
-  in: %w[www admin api],
-  message: "%{value} is reserved"
-}
-```
-
-### Comparison
-
-```ruby
-validates :end_date, comparison: { greater_than: :start_date }
-validates :age, comparison: { greater_than_or_equal_to: 18 }
-```
-
-## Conditional Validations
-
-```ruby
-# With if/unless
-validates :card_number, presence: true, if: :paid_with_card?
-validates :reason, presence: true, unless: :approved?
-
-# With Proc
-validates :password, presence: true, if: -> { new_record? || password_changed? }
-
-# Multiple conditions
-validates :bio, length: { maximum: 500 },
-          if: :bio_present?,
-          unless: :admin?
-
-# With on: option
-validates :password, presence: true, on: :create
-validates :email, uniqueness: true, on: :update
-```
-
-## Custom Validations
-
-### Custom Method
-
-```ruby
-class Order < ApplicationRecord
-  validate :delivery_date_in_future
-  validate :has_items, on: :create
-
-  private
-
-  def delivery_date_in_future
-    return unless delivery_date.present?
-
-    if delivery_date <= Date.current
-      errors.add(:delivery_date, "must be in the future")
-    end
-  end
-
-  def has_items
-    if items.empty?
-      errors.add(:base, "Order must have at least one item")
-    end
-  end
-end
-```
-
-### Custom Validator Class
+Extract reusable validators to `app/validators/` when the same validation logic appears in multiple models:
 
 ```ruby
 # app/validators/email_validator.rb
 class EmailValidator < ActiveModel::EachValidator
   def validate_each(record, attribute, value)
     return if value.blank?
-
     unless value =~ URI::MailTo::EMAIL_REGEXP
       record.errors.add(attribute, options[:message] || "is not a valid email")
     end
-
     if options[:disposable] == false && disposable_email?(value)
       record.errors.add(attribute, "cannot be a disposable email")
     end
@@ -165,24 +40,18 @@ class EmailValidator < ActiveModel::EachValidator
   end
 end
 
-# Usage
-class User < ApplicationRecord
-  validates :email, email: { disposable: false }
-end
+# Usage: validates :email, email: { disposable: false }
 ```
 
-### Reusable Validation Concern
+## Validation Concerns for Cross-Cutting Patterns
 
 ```ruby
 # app/models/concerns/sluggable.rb
 module Sluggable
   extend ActiveSupport::Concern
-
   included do
-    validates :slug, presence: true,
-              uniqueness: true,
+    validates :slug, presence: true, uniqueness: true,
               format: { with: /\A[a-z0-9-]+\z/ }
-
     before_validation :generate_slug, on: :create
   end
 
@@ -192,137 +61,39 @@ module Sluggable
     self.slug ||= name&.parameterize
   end
 end
-
-# Usage
-class Post < ApplicationRecord
-  include Sluggable
-end
 ```
 
 ## Validation Contexts
 
-```ruby
-class User < ApplicationRecord
-  validates :terms_accepted, acceptance: true, on: :registration
-  validates :admin_note, presence: true, on: :admin_update
-end
+Use custom contexts sparingly — only when a model genuinely has different validity rules in different workflows:
 
-# Usage
+```ruby
+validates :terms_accepted, acceptance: true, on: :registration
 user.save(context: :registration)
-user.valid?(:admin_update)
-```
-
-## Validation Errors
-
-### Accessing Errors
-
-```ruby
-user.valid?
-user.errors.full_messages  # ["Email can't be blank", "Name is too short"]
-user.errors[:email]        # ["can't be blank", "is invalid"]
-user.errors.of_kind?(:email, :blank)  # true
-user.errors.added?(:email, :blank)    # true
-```
-
-### Custom Error Messages
-
-```ruby
-validates :email, presence: { message: "is required" }
-validates :age, numericality: {
-  greater_than: 18,
-  message: "you must be at least 18 years old"
-}
-
-# With interpolation
-validates :name, length: {
-  minimum: 3,
-  message: "must be at least %{count} characters"
-}
-
-# In locale file
-# config/locales/en.yml
-en:
-  activerecord:
-    errors:
-      models:
-        user:
-          attributes:
-            email:
-              taken: "is already registered"
 ```
 
 ## Strict Validations
 
-Raise exception instead of adding errors:
+Use for programmer errors (not user input errors):
 
 ```ruby
 validates :token, presence: true, strict: true
 # Raises ActiveModel::StrictValidationFailed
-
-validates :api_key, presence: true, strict: ApiKeyError
-# Raises custom exception
-```
-
-## Database Constraints
-
-Always complement validations with database constraints:
-
-```ruby
-# Migration
-class AddConstraintsToUsers < ActiveRecord::Migration[7.1]
-  def change
-    change_column_null :users, :email, false
-    add_index :users, :email, unique: true
-
-    # Check constraint (PostgreSQL)
-    add_check_constraint :users, "age >= 0", name: "users_age_positive"
-
-    # Foreign key
-    add_foreign_key :posts, :users, on_delete: :cascade
-  end
-end
 ```
 
 ## Skipping Validations
 
-Use cautiously:
+Use cautiously and document why:
 
-```ruby
-user.save(validate: false)
-User.insert_all([...])  # Bulk insert without validations
-user.update_column(:admin, true)  # Single column, no validations/callbacks
-user.update_columns(admin: true, role: 'admin')
-```
+- `save(validate: false)` — data migrations only
+- `update_column` / `update_columns` — targeted fixes, skips callbacks too
+- `insert_all` — bulk imports with pre-validated data
 
-## Best Practices
+## Key Rules
 
-### Do
-- Add database constraints for critical validations
-- Use built-in validators when possible
-- Extract complex validations to custom validators
-- Test validations thoroughly
-- Use meaningful error messages
-
-### Don't
-- Don't rely solely on model validations for data integrity
-- Don't use `validates_associated` without understanding cascading
-- Don't skip validations in production code
-- Don't put complex logic in validation methods
-
-## Validation Order
-
-Validations run in the order they're defined:
-
-```ruby
-class User < ApplicationRecord
-  validates :email, presence: true
-  validates :email, format: { with: URI::MailTo::EMAIL_REGEXP }
-  validates :email, uniqueness: true
-
-  # Better: combine into one
-  validates :email,
-            presence: true,
-            format: { with: URI::MailTo::EMAIL_REGEXP },
-            uniqueness: { case_sensitive: false }
-end
-```
+- Combine related validations into one `validates` call per attribute
+- Use `on: :create` / `on: :update` only when genuinely needed
+- Prefer built-in validators over custom methods for standard checks
+- Always add database constraints for critical validations — model validations alone are not sufficient for data integrity
+- Use meaningful error messages, especially for user-facing validations
+- Use i18n (`config/locales/`) for error messages in multi-locale apps

@@ -8,125 +8,37 @@ allowed-tools: Read, Grep, Glob
 
 Analyze and recommend ActiveRecord model patterns for well-structured Rails applications.
 
-## Quick Reference
-
-| Pattern | Use When | Example |
-|---------|----------|---------|
-| `belongs_to` | Child references parent | `belongs_to :organization` |
-| `has_many` | Parent has multiple children | `has_many :posts, dependent: :destroy` |
-| `has_one` | Parent has single child | `has_one :profile, dependent: :destroy` |
-| `has_many :through` | Many-to-many via join model | `has_many :tags, through: :taggings` |
-| `has_and_belongs_to_many` | Simple M2M, no join attributes | Rarely preferred over :through |
-| Value Object | Immutable domain concept | `Money`, `Address`, `DateRange` |
-| Counter Cache | Avoid COUNT queries | `belongs_to :user, counter_cache: true` |
-
 ## Supporting Documentation
 
-- [associations.md](associations.md) - Association types, options, and advanced patterns
-- [validations.md](validations.md) - Validation patterns and custom validators
-- [migrations.md](migrations.md) - Safe migration practices and rollback strategies
-- [value-objects.md](value-objects.md) - Value object and Struct patterns
+- [associations.md](associations.md) - Association decision guidance and advanced patterns
+- [validations.md](validations.md) - Validation strategy and custom validators
+- [migrations.md](migrations.md) - Safe migration practices for production
+- [value-objects.md](value-objects.md) - Value object and Struct/Data patterns
 
 ## Core Principles
 
 1. **Organize by convention**: Constants, associations, validations, scopes, callbacks, class methods, instance methods
-2. **Database-backed integrity**: Pair ActiveRecord validations with database constraints
+2. **Database-backed integrity**: Always pair ActiveRecord validations with database constraints (unique index, NOT NULL, check constraints)
 3. **Associations always have `:dependent`**: Prevent orphaned records
 4. **Use `:inverse_of`**: Ensure bidirectional association consistency
 5. **Callbacks**: **Omakase** — use freely for simple, predictable side effects ("whenever X happens, do Y"). **Service-oriented** — minimize; prefer service objects for side effects
 
 ## Model Structure Template
 
-```ruby
-class User < ApplicationRecord
-  # Constants
-  ROLES = %w[admin member guest].freeze
-
-  # Associations
-  belongs_to :organization
-  has_many :posts, dependent: :destroy, inverse_of: :author
-  has_many :comments, through: :posts
-  has_one :profile, dependent: :destroy
-
-  # Validations
-  validates :email, presence: true, uniqueness: { case_sensitive: false }
-  validates :name, presence: true, length: { maximum: 100 }
-  validates :role, inclusion: { in: ROLES }
-
-  # Scopes
-  scope :active, -> { where(active: true) }
-  scope :recent, -> { order(created_at: :desc) }
-
-  # Callbacks (minimal)
-  before_save :normalize_email
-
-  # Class methods
-  def self.find_by_email(email) = find_by(email: email.downcase.strip)
-
-  # Instance methods
-  def admin? = role == "admin"
-
-  private
-
-  def normalize_email
-    self.email = email.downcase.strip
-  end
-end
-```
+Follow standard Rails model organization. Key ordering: constants, associations, validations, scopes, callbacks, class methods, instance methods, private methods. Generate standard ActiveRecord associations, validations, and scopes following Rails conventions.
 
 ## Key Patterns
-
-### Scopes Over Class Methods
-```ruby
-scope :published, -> { where(published: true) }
-scope :by_author, ->(user) { where(author: user) }
-scope :recent, ->(n = 10) { order(created_at: :desc).limit(n) }
-# Chain: Post.published.by_author(user).recent(5)
-```
-
-### Database Constraints + Validations
-```ruby
-# migration
-add_index :users, :email, unique: true
-change_column_null :users, :email, false
-
-# model
-validates :email, presence: true, uniqueness: { case_sensitive: false }
-```
-
-### Counter Caches
-```ruby
-# migration: add_column :users, :posts_count, :integer, default: 0, null: false
-belongs_to :user, counter_cache: true
-```
-
-### Query Optimization
-```ruby
-# Avoid N+1
-User.includes(:posts, :profile).where(active: true)
-# Preload vs Eager Load
-User.preload(:posts)        # separate queries
-User.eager_load(:posts)     # single LEFT JOIN
-```
 
 ### State as Relationships (not booleans/enums)
 
 Instead of a `closed` boolean, use a related model. Stores who, when, and why.
 
 ```ruby
-# Instead of: card.update!(closed: true)
 class Card < ApplicationRecord
   has_one :closure, dependent: :destroy
-
   def closed? = closure.present?
-
-  def close!(by:, reason: nil)
-    create_closure!(creator: by, reason: reason)
-  end
-
-  def reopen!
-    closure&.destroy!
-  end
+  def close!(by:, reason: nil) = create_closure!(creator: by, reason: reason)
+  def reopen! = closure&.destroy!
 end
 
 class Closure < ApplicationRecord
@@ -192,17 +104,22 @@ class Signup
 end
 ```
 
+### Counter Cache with Default Lambda
+
+```ruby
+# migration: add_column :users, :posts_count, :integer, default: 0, null: false
+belongs_to :user, counter_cache: true
+```
+
 ## Anti-Patterns
 
 | Anti-Pattern | Problem | Fix |
 |-------------|---------|-----|
 | Fat models (500+ lines) | Hard to maintain | **Omakase:** extract concerns. **Service-oriented:** extract service objects |
-| Callbacks with complex orchestration | Hard to reason about, test fragility | **Omakase:** keep callbacks simple ("whenever X, do Y"); use model methods for multi-step workflows. **Service-oriented:** use service objects |
+| Callbacks with complex orchestration | Hard to reason about | **Omakase:** keep callbacks simple; use model methods for multi-step workflows. **Service-oriented:** use service objects |
 | Missing `:dependent` on associations | Orphaned records | Always specify `:dependent` |
 | `default_scope` | Confusing query behavior | Use named scopes instead |
 | Validations without DB constraints | Data integrity gaps | Add both layers |
-| `has_and_belongs_to_many` | No join model for future attributes | Prefer `has_many :through` |
-| String-based SQL in scopes | SQL injection risk | Use Arel or parameterized queries |
 | Boolean flags for state | No audit trail, no metadata | Use state-as-relationship pattern (Closure, Pin, Triage models) |
 
 ## Output Format

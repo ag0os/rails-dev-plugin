@@ -1,438 +1,78 @@
-# Code Smells Catalog
+# Code Smells: Rails-Specific Detection
 
-Comprehensive guide to identifying code smells in Ruby/Rails applications.
+This file covers detection heuristics specific to Rails apps that go beyond textbook definitions. For standard smell definitions, use established knowledge from Fowler's refactoring catalog and Ruby Science.
 
-## Large Class
+## Feature Envy in ActiveRecord Models
 
-**Description**: Class has too many responsibilities or instance variables
+Standard Feature Envy is straightforward. In Rails, watch for these specific patterns:
 
-**Detection**:
-- Class > 100 lines
-- More than 7-10 instance variables
-- Many unrelated methods
-
-**Symptoms**:
-- Difficult to understand
-- Changes for multiple reasons
-- Hard to test
-
-**Refactoring**: Extract Class, Extract Module
-
+**Association chain access** -- a method reaches through 2+ associations:
 ```ruby
-# Smell: Too many responsibilities
-class User < ApplicationRecord
-  # Authentication
-  def authenticate(password)
-    # ...
-  end
-
-  # Profile management
-  def update_profile(params)
-    # ...
-  end
-
-  # Billing
-  def charge_subscription
-    # ...
-  end
-
-  # Notifications
-  def send_welcome_email
-    # ...
-  end
-end
-
-# Fixed: Separated concerns
-class User < ApplicationRecord
-  has_one :user_profile
-  has_one :subscription
-
-  def authenticate(password)
-    # Authentication only
-  end
-end
-
-class UserProfile < ApplicationRecord
-  belongs_to :user
-end
-
-class Subscription < ApplicationRecord
-  belongs_to :user
-
-  def charge
-    # Billing logic
-  end
+# Smell: method lives on Order but mostly touches Customer and Address
+def shipping_label
+  "#{customer.name}\n#{customer.address.street}\n#{customer.address.city}, #{customer.address.state} #{customer.address.zip}"
 end
 ```
+Fix: push `shipping_label` to Address or use `delegate`. The method belongs where the data lives.
 
-## Long Method
-
-**Description**: Method does too many things
-
-**Detection**:
-- Method > 10-15 lines
-- Requires scrolling to understand
-- Contains multiple levels of abstraction
-- Has comments explaining sections
-
-**Refactoring**: Extract Method
-
+**Scope envy** -- a model defines scopes that filter on associated model columns:
 ```ruby
-# Smell: Too long
-def process_order
-  # Validate items
-  return false if items.empty?
+# Smell: Policy scope filtering on Person attributes
+scope :for_senior_customers, -> { joins(:person).where("people.age >= ?", 65) }
+```
+Fix: define scope on Person (`Person.seniors`) and query through it, or accept this as a pragmatic join scope but document the coupling.
 
-  # Calculate totals
-  subtotal = items.sum(&:price)
-  tax = subtotal * 0.08
-  shipping = calculate_shipping(subtotal)
-  total = subtotal + tax + shipping
+## Shotgun Surgery Across Rails Layers
 
-  # Process payment
-  payment = Payment.new(total: total)
-  return false unless payment.process!
+This is the most costly smell in Rails apps and the hardest to detect mechanically.
 
-  # Create order
-  order = Order.create!(
-    items: items,
-    subtotal: subtotal,
-    tax: tax,
-    shipping: shipping,
-    total: total
-  )
+**Detection heuristic**: When adding a new field or business rule, count the files touched. If a single concept change touches 4+ of these layers, you have shotgun surgery:
+- Migration
+- Model (validation, callback, scope)
+- Controller (strong params, assignment)
+- View/serializer (display)
+- Test files (model spec, controller spec, system spec)
+- Form object or decorator
 
-  # Send confirmation
-  OrderMailer.confirmation(order).deliver_later
+**Common causes**:
+- Business logic scattered between controller and model
+- Display logic in both helpers and views
+- Authorization checks duplicated in controller and view
 
-  true
-end
+**Fix**: consolidate the business rule into one object. Which object depends on stack profile:
+- **Omakase**: model method or concern
+- **Service-oriented**: service object or form object
+- **API-first**: form object or policy object
 
-# Fixed: Extracted methods
-def process_order
-  return false unless valid_order?
+## God Model Detection
 
-  process_payment || return
-  create_order
-  send_confirmation
+A model is becoming a god object when it exhibits 3+ of:
+- More than 10 `has_many`/`has_one` associations
+- More than 5 callbacks (before/after)
+- More than 200 lines
+- Concerns count exceeds 5
+- Methods that don't use `self` attributes (they belong elsewhere)
 
-  true
-end
+**Triage approach**: Don't refactor the entire god model at once. Identify the most actively-edited axis of change (use `git log --follow` on the file) and extract that concern first.
 
-private
+## Primitive Obsession with Status Fields
 
-def valid_order?
-  items.present?
-end
-
-def calculate_order_total
-  @total ||= subtotal + tax + shipping_cost
-end
-
-def subtotal
-  @subtotal ||= items.sum(&:price)
-end
-
-def tax
-  @tax ||= subtotal * 0.08
-end
-
-def shipping_cost
-  @shipping_cost ||= calculate_shipping(subtotal)
-end
-
-def process_payment
-  Payment.new(total: calculate_order_total).process!
-end
-
-def create_order
-  @order = Order.create!(
-    items: items,
-    subtotal: subtotal,
-    tax: tax,
-    shipping: shipping_cost,
-    total: calculate_order_total
-  )
-end
-
-def send_confirmation
-  OrderMailer.confirmation(@order).deliver_later
-end
+Rails apps frequently use string columns for status:
+```ruby
+# Smell: string status with scattered conditionals
+if policy.status == "active" && policy.payment_status == "current"
 ```
 
-## Long Parameter List
+Prefer Rails enums with scopes, or extract a state machine when transitions have business rules.
 
-**Description**: Method takes too many parameters
+## Lazy Concern (Rails-Specific Lazy Class)
 
-**Detection**:
-- More than 3 parameters
-- Same parameters appear together frequently
+A concern that wraps a single method or a single scope is noise, not reuse. Inline it unless you have evidence it will be used in 2+ models.
 
-**Refactoring**: Introduce Parameter Object
+## Summary: When to Escalate Smell Severity
 
-```ruby
-# Smell: Too many parameters
-def create_policy(policy_number, effective_date, expiry_date, premium,
-                  person_id, company_id, branch_id, producer_id)
-  # ...
-end
-
-# Fixed: Parameter object
-class PolicyParams
-  attr_reader :policy_number, :effective_date, :expiry_date, :premium,
-              :person_id, :company_id, :branch_id, :producer_id
-
-  def initialize(params)
-    @policy_number = params[:policy_number]
-    @effective_date = params[:effective_date]
-    @expiry_date = params[:expiry_date]
-    @premium = params[:premium]
-    @person_id = params[:person_id]
-    @company_id = params[:company_id]
-    @branch_id = params[:branch_id]
-    @producer_id = params[:producer_id]
-  end
-
-  def valid?
-    policy_number.present? && effective_date.present? && expiry_date.present?
-  end
-end
-
-def create_policy(params)
-  policy_params = PolicyParams.new(params)
-  return unless policy_params.valid?
-  # ...
-end
-```
-
-## Feature Envy
-
-**Description**: Method uses another object's data more than its own
-
-**Detection**:
-- Many method calls to another object
-- Minimal use of own instance variables
-- Logic naturally belongs elsewhere
-
-**Refactoring**: Move Method
-
-```ruby
-# Smell: Person class envying Policy data
-class Person < ApplicationRecord
-  has_many :policies
-
-  def total_annual_premium
-    policies.sum do |policy|
-      policy.premium * 12
-    end
-  end
-
-  def active_policies_count
-    policies.count { |p| p.status == 'active' }
-  end
-end
-
-# Fixed: Moved to Policy
-class Person < ApplicationRecord
-  has_many :policies
-
-  def total_annual_premium
-    policies.sum(&:annual_premium)
-  end
-
-  def active_policies_count
-    policies.active.count
-  end
-end
-
-class Policy < ApplicationRecord
-  belongs_to :person
-
-  scope :active, -> { where(status: 'active') }
-
-  def annual_premium
-    premium * 12
-  end
-end
-```
-
-## Data Clumps
-
-**Description**: Same group of data items appear together repeatedly
-
-**Detection**:
-- Same 2-3 variables passed together
-- Variables always used as a group
-
-**Refactoring**: Extract Class
-
-```ruby
-# Smell: Date range clump
-def policies_expiring(start_date, end_date)
-  Policy.where(expiry_date: start_date..end_date)
-end
-
-def claims_filed(start_date, end_date)
-  Claim.where(filed_at: start_date..end_date)
-end
-
-def premiums_collected(start_date, end_date)
-  Payment.where(paid_at: start_date..end_date).sum(:amount)
-end
-
-# Fixed: Extract DateRange class
-class DateRange
-  attr_reader :start_date, :end_date
-
-  def initialize(start_date, end_date)
-    @start_date = start_date
-    @end_date = end_date
-  end
-
-  def to_range
-    start_date..end_date
-  end
-
-  def self.this_month
-    new(Date.today.beginning_of_month, Date.today.end_of_month)
-  end
-
-  def self.last_30_days
-    new(30.days.ago.to_date, Date.today)
-  end
-end
-
-def policies_expiring(date_range)
-  Policy.where(expiry_date: date_range.to_range)
-end
-
-def claims_filed(date_range)
-  Claim.where(filed_at: date_range.to_range)
-end
-
-def premiums_collected(date_range)
-  Payment.where(paid_at: date_range.to_range).sum(:amount)
-end
-```
-
-## Primitive Obsession
-
-**Description**: Using primitives (strings, integers) instead of small objects
-
-**Detection**:
-- String used for states/types
-- Multiple related primitives
-- Validation/behavior attached to primitives
-
-**Refactoring**: Extract Value Object
-
-```ruby
-# Smell: Primitive obsession with money
-class Policy < ApplicationRecord
-  # premium stored as integer cents
-  attribute :premium, :integer
-
-  def premium_in_dollars
-    premium / 100.0
-  end
-
-  def formatted_premium
-    "$#{premium_in_dollars}"
-  end
-
-  def increase_premium(percentage)
-    self.premium = (premium * (1 + percentage / 100.0)).round
-  end
-end
-
-# Fixed: Money value object
-class Money
-  attr_reader :cents
-
-  def initialize(cents)
-    @cents = cents
-  end
-
-  def self.from_dollars(dollars)
-    new((dollars * 100).round)
-  end
-
-  def to_dollars
-    cents / 100.0
-  end
-
-  def to_s
-    "$#{'%.2f' % to_dollars}"
-  end
-
-  def +(other)
-    Money.new(cents + other.cents)
-  end
-
-  def *(multiplier)
-    Money.new((cents * multiplier).round)
-  end
-
-  def increase_by_percentage(percentage)
-    self * (1 + percentage / 100.0)
-  end
-end
-
-class Policy < ApplicationRecord
-  def premium
-    Money.new(self[:premium])
-  end
-
-  def premium=(money)
-    self[:premium] = money.cents
-  end
-end
-```
-
-## Shotgun Surgery
-
-**Description**: Change requires many small edits across many classes
-
-**Detection**:
-- Single change touches many files
-- Related code scattered across codebase
-- Difficult to ensure all changes made
-
-**Refactoring**: Move Method, Extract Class
-
-## Divergent Change
-
-**Description**: Class changes for multiple different reasons
-
-**Detection**:
-- "When X changes, we modify this class"
-- "When Y changes, we also modify this class"
-- Multiple axes of change
-
-**Refactoring**: Extract Class
-
-## Lazy Class
-
-**Description**: Class doesn't do enough to justify existence
-
-**Detection**:
-- Very few methods
-- Simple delegation
-- Could be absorbed by another class
-
-**Refactoring**: Inline Class, Collapse Hierarchy
-
-## Summary
-
-| Smell | Detection | Refactoring |
-|-------|-----------|-------------|
-| Large Class | > 100 lines, many instance vars | Extract Class |
-| Long Method | > 10-15 lines | Extract Method |
-| Long Parameter List | > 3 parameters | Parameter Object |
-| Feature Envy | Uses other object's data | Move Method |
-| Data Clumps | Same vars together | Extract Class |
-| Primitive Obsession | Primitives with behavior | Value Object |
-| Shotgun Surgery | Many files for one change | Move Method |
-| Divergent Change | Multiple reasons to change | Extract Class |
-
-Remember: These are **guidelines**, not strict rules. Context matters!
+Upgrade a smell's priority when:
+- The file appears in >30% of recent PRs (`git log --oneline --diff-filter=M`)
+- Multiple developers report confusion about where logic lives
+- Test setup for the class requires >20 lines of factory setup
+- The class has a Flog score above 100 or ABC score above 30

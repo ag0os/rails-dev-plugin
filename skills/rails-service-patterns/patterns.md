@@ -1,95 +1,15 @@
-# Service Object Patterns
+# Service Object Patterns — Detailed Reference
 
-Detailed implementations for common service patterns in Rails.
+## Enhanced Result with Monad-Like Chaining
 
-## Basic Service Pattern
-
-Standard service with transaction handling:
-
-```ruby
-class CreateOrder
-  def initialize(user, cart_items, payment_method)
-    @user = user
-    @cart_items = cart_items
-    @payment_method = payment_method
-  end
-
-  def call
-    ActiveRecord::Base.transaction do
-      order = create_order
-      create_order_items(order)
-      process_payment(order)
-      send_confirmation_email(order)
-      order
-    end
-  rescue PaymentError => e
-    handle_payment_error(e)
-  end
-
-  private
-
-  def create_order
-    @user.orders.create!(
-      total: calculate_total,
-      status: 'pending'
-    )
-  end
-
-  def calculate_total
-    @cart_items.sum { |item| item.price * item.quantity }
-  end
-end
-
-# Usage
-order = CreateOrder.new(user, cart_items, payment_method).call
-```
-
-## Result Object Pattern
-
-When callers need to know success/failure with data:
-
-```ruby
-class AuthenticateUser
-  Result = Struct.new(:success?, :user, :error, keyword_init: true)
-
-  def initialize(email, password)
-    @email = email
-    @password = password
-  end
-
-  def call
-    user = User.find_by(email: @email)
-
-    if user&.authenticate(@password)
-      Result.new(success?: true, user: user)
-    else
-      Result.new(success?: false, error: 'Invalid credentials')
-    end
-  end
-end
-
-# Usage
-result = AuthenticateUser.new(email, password).call
-if result.success?
-  sign_in(result.user)
-else
-  flash[:error] = result.error
-end
-```
-
-### Enhanced Result with Monad Pattern
+The simple `Struct` result works for most cases. When you need chainable callbacks:
 
 ```ruby
 class ServiceResult
   attr_reader :value, :error
 
-  def self.success(value)
-    new(value: value, success: true)
-  end
-
-  def self.failure(error)
-    new(error: error, success: false)
-  end
+  def self.success(value) = new(value: value, success: true)
+  def self.failure(error) = new(error: error, success: false)
 
   def initialize(value: nil, error: nil, success:)
     @value = value
@@ -97,13 +17,8 @@ class ServiceResult
     @success = success
   end
 
-  def success?
-    @success
-  end
-
-  def failure?
-    !@success
-  end
+  def success? = @success
+  def failure? = !@success
 
   def on_success
     yield(value) if success?
@@ -124,7 +39,7 @@ ProcessPayment.new(order).call
 
 ## Form Object Pattern
 
-For complex forms spanning multiple models:
+Use `ActiveModel::Model` for complex forms spanning multiple models. The form replaces the controller's role of coordinating creation across models.
 
 ```ruby
 class RegistrationForm
@@ -135,8 +50,7 @@ class RegistrationForm
                 :company_name, :company_size
 
   validates :email, presence: true, format: { with: URI::MailTo::EMAIL_REGEXP }
-  validates :password, presence: true, length: { minimum: 8 }
-  validates :password, confirmation: true
+  validates :password, presence: true, length: { minimum: 8 }, confirmation: true
   validates :company_name, presence: true
 
   def save
@@ -153,7 +67,7 @@ class RegistrationForm
   end
 end
 
-# In controller
+# Controller stays thin
 def create
   @form = RegistrationForm.new(registration_params)
   if @form.save
@@ -164,31 +78,9 @@ def create
 end
 ```
 
-## Query Object Pattern
+## Composable Query Objects
 
-For complex database queries:
-
-```ruby
-class ExpiredPoliciesQuery
-  def initialize(relation = Policy.all)
-    @relation = relation
-  end
-
-  def call(grace_period: 30.days)
-    @relation
-      .where(status: 'active')
-      .where('expiry_date < ?', grace_period.ago)
-      .includes(:holder, :agent)
-      .order(expiry_date: :asc)
-  end
-end
-
-# Usage
-expired = ExpiredPoliciesQuery.new.call
-expired_for_agent = ExpiredPoliciesQuery.new(agent.policies).call(grace_period: 15.days)
-```
-
-### Composable Query Objects
+For complex queries that need to be reused and composed. Follow standard Rails conventions for basic scopes — only extract a query object when the query logic is reusable across controllers or involves complex joins/subqueries.
 
 ```ruby
 class PolicySearch
@@ -202,7 +94,7 @@ class PolicySearch
   end
 
   def expiring_within(days)
-    @relation = @relation.where('expiry_date < ?', days.from_now)
+    @relation = @relation.where("expiry_date < ?", days.from_now)
     self
   end
 
@@ -211,192 +103,59 @@ class PolicySearch
     self
   end
 
-  def results
-    @relation
-  end
+  def results = @relation
 end
 
 # Chainable usage
 PolicySearch.new
-  .by_status('active')
+  .by_status("active")
   .expiring_within(30.days)
   .for_agent(current_agent)
   .results
 ```
 
-## Policy Object Pattern
-
-For authorization logic (similar to Pundit):
-
-```ruby
-class PolicyPolicy  # Naming: ResourcePolicy
-  attr_reader :user, :policy
-
-  def initialize(user, policy)
-    @user = user
-    @policy = policy
-  end
-
-  def show?
-    owner? || agent? || admin?
-  end
-
-  def update?
-    agent? || admin?
-  end
-
-  def destroy?
-    admin?
-  end
-
-  private
-
-  def owner?
-    policy.holder == user
-  end
-
-  def agent?
-    policy.agent == user
-  end
-
-  def admin?
-    user.admin?
-  end
-end
-
-# Usage
-def show
-  @policy = Policy.find(params[:id])
-  authorize(@policy) # Raises if PolicyPolicy.new(current_user, @policy).show? is false
-end
-```
-
-## External API Integration Service
-
-```ruby
-class WeatherService
-  include HTTParty
-  base_uri 'api.weather.com'
-
-  def initialize(api_key = ENV['WEATHER_API_KEY'])
-    @options = { query: { api_key: api_key } }
-  end
-
-  def current_weather(city)
-    response = self.class.get("/current/#{city}", @options)
-
-    if response.success?
-      parse_weather_data(response)
-    else
-      raise WeatherAPIError, response.message
-    end
-  rescue HTTParty::Error => e
-    Rails.logger.error "Weather API error: #{e.message}"
-    raise WeatherAPIError, "Unable to fetch weather data"
-  end
-
-  private
-
-  def parse_weather_data(response)
-    WeatherData.new(
-      temperature: response['temp'],
-      conditions: response['conditions'],
-      humidity: response['humidity']
-    )
-  end
-end
-```
-
-## Error Handling Patterns
-
-### Custom Exception Classes
-
-```ruby
-# app/errors/service_errors.rb
-module ServiceErrors
-  class BaseError < StandardError
-    attr_reader :code, :details
-
-    def initialize(message, code: nil, details: {})
-      super(message)
-      @code = code
-      @details = details
-    end
-  end
-
-  class ValidationError < BaseError; end
-  class NotFoundError < BaseError; end
-  class AuthorizationError < BaseError; end
-  class ExternalServiceError < BaseError; end
-end
-
-# Usage in service
-class ProcessPayment
-  def call
-    raise ServiceErrors::ValidationError.new(
-      "Invalid amount",
-      code: :invalid_amount,
-      details: { amount: @amount }
-    ) if @amount <= 0
-
-    # ...
-  end
-end
-```
-
 ## Directory Organization
+
+Group services by domain when you have more than ~10 service files:
 
 ```
 app/services/
-├── application_service.rb      # Base class (optional)
-├── concerns/                   # Shared service concerns
-│   └── transactional.rb
-├── orders/                     # Domain-grouped services
-│   ├── create_order.rb
-│   ├── process_order.rb
-│   └── cancel_order.rb
-├── payments/
-│   ├── process_payment.rb
-│   └── refund_payment.rb
-└── notifications/
-    ├── send_email.rb
-    └── send_sms.rb
+  orders/
+    create_order.rb
+    cancel_order.rb
+  payments/
+    process_payment.rb
+    refund_payment.rb
+  notifications/
+    send_welcome.rb
 ```
 
-## Base Service Class (Optional)
+Keep a flat `app/services/` structure until the domain grouping becomes necessary. Premature namespacing adds indirection without value.
+
+## Error Handling Strategy
+
+| Error Type | Handling | Example |
+|-----------|---------|---------|
+| Expected failure (validation, auth) | Return `Result.failure(...)` | Invalid credentials, payment declined |
+| Unexpected failure (network, system) | Raise exception, let caller rescue | `Net::OpenTimeout`, database down |
+| Domain rule violation | Return `Result.failure(...)` | Insufficient funds, expired subscription |
+
+**Key rule:** If the caller needs to branch on the outcome, use a Result. If the caller can't meaningfully recover, raise an exception.
 
 ```ruby
-class ApplicationService
-  def self.call(...)
-    new(...).call
-  end
-
-  private
-
-  def success(data = nil)
-    ServiceResult.success(data)
-  end
-
-  def failure(error)
-    ServiceResult.failure(error)
-  end
-end
-
-# Usage
-class CreateOrder < ApplicationService
-  def initialize(user, params)
-    @user = user
-    @params = params
-  end
-
+class ProcessPayment
   def call
-    order = @user.orders.create!(@params)
-    success(order)
-  rescue ActiveRecord::RecordInvalid => e
-    failure(e.message)
+    # Expected failure -> Result
+    return failure("Amount must be positive") if @amount <= 0
+
+    # Unexpected failure -> let it raise (or rescue at top level)
+    response = PaymentGateway.charge(@amount, @token)
+
+    if response.success?
+      success(response.charge)
+    else
+      failure(response.error_message)  # Expected: card declined, etc.
+    end
   end
 end
-
-# Call without .new
-result = CreateOrder.call(user, params)
 ```
