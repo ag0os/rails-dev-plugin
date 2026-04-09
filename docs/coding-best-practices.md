@@ -1,55 +1,35 @@
-# Coding Best Practices: Avoiding Code Smells
+# Coding Best Practices
 
-Use these principles when writing or modifying code. They are language-agnostic and paradigm-agnostic -- applicable to object-oriented, functional, and multi-paradigm codebases alike.
+Corrective guidelines for code generation. These address common tendencies that produce over-engineered, fragile, or needlessly complex code. Apply your training knowledge of clean code, SOLID, and refactoring -- these directives steer your judgment on where that knowledge is most often misapplied.
 
-## Function / Method Design
+## Resist Over-Engineering
 
-- **Keep functions short.** If a function exceeds 10-15 lines, extract a well-named helper. Each function should do one thing.
-- **Prefer pure functions.** Given the same inputs, return the same output with no side effects. Pure functions are easier to test, compose, and reason about.
-- **Limit parameters to 3 or fewer.** When a function needs more, group related parameters into an object or named struct.
-- **Don't pass data through functions just to relay it.** If a parameter is only forwarded to another call, the dependency graph needs restructuring.
+- A function is not a class. Don't wrap stateless logic in a class just to give it a `call` or `execute` method.
+- Don't name things after design patterns (`UserFactory`, `OrderBuilder`, `PaymentStrategy`). Name after domain purpose.
+- Don't add extension points, configuration options, or abstraction layers unless the current task demands them. Solve today's problem.
+- Three similar lines of code is better than a premature abstraction. Extract only when duplication appears 3+ times with the same intent.
+- Start with the simplest data structure (hash/dict, tuple, record). Graduate to a class only when you need behavior, validation, or encapsulation -- not before.
 
-## Structural Organization
+## Separate What Changes From What Doesn't
 
-- **Keep units of organization focused.** Whether a class, module, or namespace -- if it exceeds ~100 lines, it likely has multiple responsibilities. Split along axes of change.
-- **Don't create a class when a function will do.** If there's no state to manage, use a plain function or module.
-- **Don't create single-method classes.** A class with only one public method is usually a function in disguise -- unless it genuinely needs constructor-injected dependencies.
-- **Name after purpose, not mechanism.** Avoid names like `UserFactory`, `OrderBuilder`, `PaymentStrategy`. Name after what it represents in the domain, not the design pattern it implements.
-- **Objects must be valid after construction.** Never require multi-step setup ceremonies. If an object can exist in an invalid state, fix the constructor.
-- **Push side effects to the edges.** Keep core logic pure. Perform I/O, mutation, and external calls at the boundaries of your system, not deep in business logic.
+- Push side effects (I/O, mutation, external calls) to the boundaries. Keep core logic pure and testable.
+- Model variants as data (sum types, discriminated unions, enums with behavior) -- not as string flags with scattered conditionals.
+- When the same type/status check appears in multiple places, centralize it with polymorphic dispatch or pattern matching. Don't scatter it.
+- If a single feature change touches 4+ files across layers, the related logic is too scattered. Colocate things that change together.
 
-## Data Modeling
+## Respect Duplication Nuance
 
-- **Don't use primitives for domain concepts.** Wrap meaningful values (money, email, coordinates, status) in dedicated types -- whether classes with methods or types with associated functions.
-- **Prefer immutable data.** Use your language's immutable record, struct, data class, or frozen type for values that don't need to change. Return new values instead of mutating existing ones.
-- **Model variants as data, not flags.** Use sum types, discriminated unions, or sealed hierarchies to represent mutually exclusive states. A `status` string with conditionals scattered everywhere is a code smell regardless of paradigm.
-- **Graduate data structures incrementally.** Start simple (hash/dict/map), move to named struct/record/tuple, then full class or algebraic data type. Only upgrade when you need behavior, validation, or encapsulation.
-- **Group data that travels together.** If the same 3+ fields appear in multiple function signatures or modules, they belong in their own type.
+- Same code is not always real duplication. If two blocks look identical but would change for different reasons, leave them separate.
+- When duplication is real, extract it. But don't DRY across boundaries (modules, services) just to eliminate surface similarity.
 
-## Conditional Logic
+## Keep Coupling Shallow
 
-- **Replace complex conditionals with dispatch.** If you switch on type or status in multiple places, use polymorphic dispatch (OOP) or pattern matching on sum types (FP) instead.
-- **Flatten nested conditionals.** Use guard clauses and early returns. Each nesting level adds cognitive load.
-- **Centralize state-dependent behavior.** Don't scatter status or type checks across the codebase. Handle them in one place.
-- **Prefer data transformations over in-place mutation.** Pipeline data through a chain of transforms rather than modifying state in successive steps. This makes data flow explicit and each step independently testable.
+- Don't reach through `a.b.c.d`. Callers should only talk to immediate collaborators.
+- Don't pass parameters through functions just to relay them. If a param is only forwarded, the dependency graph needs restructuring.
+- Group fields that always travel together into their own type rather than passing them individually.
 
-## Code Duplication and Coupling
+## Refactoring Safety
 
-- **Extract duplicated logic, but only when the duplication is real.** Same code with different reasons to change is not true duplication -- leave it alone.
-- **Colocate related logic.** In OOP, move methods to the class whose data they use. In FP, group related functions in the same module. Either way, keep things that change together close together.
-- **Minimize cross-cutting changes.** If adding a single feature requires touching 4+ files across different layers, the related logic is too scattered. Consolidate it.
-- **Minimize deep data access.** Reaching through `a.b.c.d` couples you to the entire structure. In OOP, delegate. In FP, destructure at the boundary or use accessor utilities. Callers should only know about their immediate dependencies.
-
-## Refactoring Discipline
-
-- **One refactoring per commit.** Never batch multiple structural changes together.
-- **Ensure test coverage before refactoring.** If tests don't exist, write characterization tests first that capture current behavior.
-- **Make the smallest possible change, then verify.** Run tests after each step. Small steps prevent compounding errors.
-- **Never change behavior while refactoring.** Refactoring changes structure, not behavior. If you need both, do them in separate commits.
-
-## Design Judgment
-
-- **Don't over-abstract.** Three similar lines of code is better than a premature abstraction. Extract only when a pattern appears 3+ times with the same intent.
-- **Don't design for hypothetical futures.** Solve today's problem. Speculative abstractions add complexity without value.
-- **Prefer composition over inheritance.** Inheritance creates rigid hierarchies. Mix in behavior, compose functions, or inject collaborators instead.
-- **Evaluate trade-offs explicitly.** Every refactoring adds indirection. Ask: does this improve readability, testability, or changeability enough to justify the added complexity?
+- One structural change per commit. Verify tests pass after each step.
+- Never change behavior and structure in the same commit.
+- If test coverage doesn't exist, write characterization tests before refactoring.
