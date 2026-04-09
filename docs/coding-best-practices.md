@@ -28,6 +28,11 @@ Corrective guidelines for code generation. These address common tendencies that 
 - Don't pass parameters through functions just to relay them. If a param is only forwarded, the dependency graph needs restructuring.
 - Group fields that always travel together into their own type rather than passing them individually.
 
+## Comments
+
+- Don't leave working comments (`// TODO: refactor this`, `// added to fix X`, `// handles the edge case from issue #123`). These are scaffolding — remove them once the code works.
+- Only comment **why**, never **what**. If a comment restates the code, delete it. If the code needs a comment to explain what it does, rewrite the code.
+
 ## Refactoring Safety
 
 - One structural change per commit. Verify tests pass after each step.
