@@ -39,10 +39,10 @@ This is the most costly smell in Rails apps and the hardest to detect mechanical
 - Display logic in both helpers and views
 - Authorization checks duplicated in controller and view
 
-**Fix**: consolidate the business rule into one object. Which object depends on stack profile:
-- **Omakase**: model method or concern
-- **Service-oriented**: service object or form object
-- **API-first**: form object or policy object
+**Fix**: consolidate the business rule into one object. Which object depends on the stack axes (`rails-stack-profiles`):
+- Axis A `native`: model method or concern
+- Axis A `extracted`: service object or form object
+- Axis B `api`: form object or policy object for what would otherwise be view logic
 
 ## God Model Detection
 

@@ -10,7 +10,14 @@ Analyze and recommend Action Mailer patterns for reliable, well-structured email
 
 Follow standard Rails conventions for basic mailer structure, `mail()` calls, delivery configuration, multipart templates, attachments, and I18n subjects. Focus on the opinionated patterns below.
 
-See [patterns.md](patterns.md) for detailed code examples.
+## Supporting Documentation
+
+- [patterns.md](patterns.md) - detailed code examples
+- [delivery-trigger.native.md](delivery-trigger.native.md) / [delivery-trigger.extracted.md](delivery-trigger.extracted.md) - what triggers delivery, per Axis A
+
+## Resolve the axis first
+
+What triggers email delivery forks on **Axis A — logic placement** (`rails-stack-profiles`). Resolve it (or reuse the session value), then read the matching delivery-trigger guide above. `native` if it cannot be resolved.
 
 ## Quick Reference
 
@@ -20,7 +27,6 @@ See [patterns.md](patterns.md) for detailed code examples.
 | Mailer preview per method | Every mailer method needs a preview — catches layout issues CI cannot |
 | Staging interceptor | Prevent real emails in non-production environments |
 | `_later`/`_now` convention | Model triggers delivery; mailer is just the template layer |
-| Profile-aware testing | Minitest (omakase) vs RSpec (service-oriented) |
 
 ## Core Principles
 
@@ -97,8 +103,8 @@ end
 ## Previews
 
 ```ruby
-# test/mailers/previews/order_mailer_preview.rb  (Omakase)
-# spec/mailers/previews/order_mailer_preview.rb   (Service-oriented)
+# Preview lives under the project's test directory:
+#   test/mailers/previews/  or  spec/mailers/previews/
 class OrderMailerPreview < ActionMailer::Preview
   def confirmation
     order = Order.first || Order.new(id: 1, number: "PREVIEW-001", created_at: Time.current)
@@ -113,72 +119,15 @@ end
 # Visit: http://localhost:3000/rails/mailers/order_mailer/confirmation
 ```
 
-## Profile-Aware Delivery Triggers
+## Delivery Triggers
 
-**Omakase — model triggers delivery:**
+What triggers `deliver_later` depends on Axis A — see [delivery-trigger.native.md](delivery-trigger.native.md) or [delivery-trigger.extracted.md](delivery-trigger.extracted.md).
 
-```ruby
-class Order < ApplicationRecord
-  after_create_commit :send_confirmation
+## Testing Mailers
 
-  private
+Assert the same things regardless of framework: the email enqueues (or sends), the recipients and subject are correct, and the body includes the expected content. `ActionMailer::TestCase` / `assert_emails` and `have_enqueued_mail` are the core tools.
 
-  def send_confirmation
-    OrderMailer.confirmation(self).deliver_later
-  end
-end
-```
-
-**Service-oriented — service triggers delivery:**
-
-```ruby
-class Orders::Create
-  def call
-    order = Order.create!(params)
-    OrderMailer.confirmation(order).deliver_later
-    Result.new(success: true, order: order)
-  end
-end
-```
-
-## Profile-Aware Testing
-
-**Omakase — Minitest:**
-
-```ruby
-class OrderMailerTest < ActionMailer::TestCase
-  test "confirmation email" do
-    order = orders(:confirmed)
-    email = OrderMailer.confirmation(order)
-
-    assert_emails 1 do
-      email.deliver_now
-    end
-    assert_equal [order.user.email], email.to
-    assert_match "Order ##{order.number}", email.subject
-  end
-end
-```
-
-**Service-oriented — RSpec:**
-
-```ruby
-RSpec.describe OrderMailer, type: :mailer do
-  describe "#confirmation" do
-    let(:order) { create(:order) }
-    let(:mail) { described_class.confirmation(order) }
-
-    it "renders the headers" do
-      expect(mail.to).to eq([order.user.email])
-      expect(mail.subject).to match(/Order ##{order.number}/)
-    end
-
-    it "renders the body" do
-      expect(mail.body.encoded).to include(order.number)
-    end
-  end
-end
-```
+Write the test in the project's framework — read it from the `project-conventions` fingerprint (Testing category). Framework-specific patterns belong to `rails-testing-patterns`; do not infer the framework from architecture.
 
 ## Anti-Patterns
 
@@ -196,5 +145,5 @@ When creating mailers, provide:
 1. **Mailer class** with proper structure
 2. **View templates** (HTML + text parts)
 3. **Preview class** for visual testing
-4. **Test file** matching project profile (Minitest or RSpec)
+4. **Test file** in the project's framework (read it from the `project-conventions` fingerprint)
 5. **Delivery configuration** notes if relevant

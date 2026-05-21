@@ -8,6 +8,8 @@ allowed-tools: Read, Grep, Glob
 
 Analyze and recommend best practices for Rails API design including controllers, serialization, authentication, versioning, and error handling.
 
+**Applies on the `api` delivery axis** (Axis B, `rails-stack-profiles`) — including an `/api` namespace inside an otherwise `html` app. For server-rendered HTML use `rails-views-patterns` and `hotwire-patterns`.
+
 Follow standard Rails API controller conventions (`ActionController::API`, strong parameters, `rescue_from`). See [patterns.md](patterns.md) for opinionated decisions and configuration.
 
 ## Quick Reference

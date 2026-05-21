@@ -1,7 +1,7 @@
 {
   "name": "rails-dev-plugin",
-  "description": "Rails development plugin with 11 specialized agents and 18 portable Skills. Agents are lean orchestrators that load domain-specific Skills for models, controllers, views, services, jobs, testing, architecture, DevOps, GraphQL, Hotwire, API design, mailers, authentication, caching, Ruby refactoring, object-oriented design, and project convention detection. Adapts recommendations to the project's stack profile (omakase, service-oriented, or api-first) and auto-detected project conventions. Skills are independently usable and exportable to other platforms.",
-  "version": "2.0.0",
+  "description": "Rails development plugin with specialized agents and portable Skills. Agents are lean orchestrators that load domain-specific Skills for models, controllers, views, services, jobs, testing, architecture, DevOps, GraphQL, Hotwire, API design, mailers, authentication, caching, Ruby refactoring, object-oriented design, and project convention detection. Adapts recommendations to the project's architecture axes (logic placement and delivery) and auto-detected project conventions. Skills are independently usable and exportable to other platforms.",
+  "version": "3.0.0",
   "author": {
     "name": "ag0os",
     "url": "https://github.com/ag0os"

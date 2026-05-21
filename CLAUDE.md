@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Claude Code plugin that provides 11 specialized agents and 18 portable skills for Rails application development. Agents are lean orchestrators that load domain-specific skills via the `skills` frontmatter field. Skills are independently usable and exportable to other platforms.
+This is a Claude Code plugin that provides specialized agents and portable skills for Rails application development. Agents are lean orchestrators that load domain-specific skills via the `skills` frontmatter field. Skills are independently usable and exportable to other platforms.
 
 ## Repository Structure
 
@@ -12,7 +12,7 @@ This is a Claude Code plugin that provides 11 specialized agents and 18 portable
 rails-dev-plugin/
 ├── .claude-plugin/
 │   └── plugin.json                     # Plugin metadata (name, version, description)
-├── agents/                              # 11 lean agents (reference skills for knowledge)
+├── agents/                              # lean agents (reference skills for knowledge)
 │   ├── rails-model.md                   # skills: [rails-model-patterns]
 │   ├── rails-controller.md              # skills: [rails-controller-patterns]
 │   ├── rails-views.md                   # skills: [rails-views-patterns]
@@ -24,7 +24,7 @@ rails-dev-plugin/
 │   ├── rails-architect.md               # skills: [rails-architecture-patterns]
 │   ├── rails-devops.md                  # skills: [rails-devops-patterns]
 │   └── rails-api.md                     # skills: [rails-api-patterns, rails-controller-patterns]
-└── skills/                              # 18 portable skills (domain knowledge)
+└── skills/                              # portable skills (domain knowledge)
     ├── rails-model-patterns/            # ActiveRecord, associations, migrations
     ├── rails-controller-patterns/       # RESTful controllers, routing, params
     ├── rails-views-patterns/            # ERB, partials, helpers, caching
@@ -36,7 +36,7 @@ rails-dev-plugin/
     ├── rails-architecture-patterns/     # Planning, design decisions, skill directory
     ├── rails-devops-patterns/           # Docker, CI/CD, monitoring, security
     ├── rails-api-patterns/              # API controllers, serialization, JWT
-    ├── rails-stack-profiles/            # Stack profile detection (omakase, service-oriented, api-first)
+    ├── rails-stack-profiles/            # Architecture axis detection (logic placement, delivery)
     ├── rails-mailer-patterns/           # Action Mailer, email delivery, previews
     ├── rails-auth-patterns/             # Authentication (built-in vs Devise)
     ├── rails-caching-patterns/          # Fragment, low-level, HTTP caching
@@ -57,11 +57,18 @@ Agents use the `skills` frontmatter field to preload skill content at startup. T
 - Skills work independently (invoked in main conversation) AND as agent knowledge
 - Skills are exportable to other platforms without modification
 
-### Stack Profiles
+### Architecture Axes
 
-The plugin supports three Rails stack profiles: **omakase**, **service-oriented**, and **api-first** (plus hybrids). The `rails-stack-profiles` skill defines detection logic and per-profile recommendations. The architect agent detects the profile as Step 0 before making any recommendations.
+The plugin classifies a project's architecture as **two independent binary axes**, not a three-value profile enum:
 
-Other skills and agents should present profile-appropriate patterns when the decision differs by profile (e.g., "extract to concern" for omakase vs "extract to service object" for service-oriented). See `skills/rails-stack-profiles/` for details.
+- **Axis A — logic placement:** `native` (logic in models + concerns) vs `extracted` (service/command objects)
+- **Axis B — delivery:** `html` (server-rendered views + Hotwire) vs `api` (headless JSON)
+
+The `rails-stack-profiles` skill defines detection logic and per-axis guidance (`axis-a.md`, `axis-b.md`). The architect agent resolves both axes as Step 0, once per session.
+
+**Orthogonal project facts** — test framework, job/cache backend, auth library — are NOT axes. They are detected by `project-conventions` and consumed from its fingerprint. Never infer them from architecture.
+
+Skills must not carry inline profile conditionals. See the Skill Development Guidelines below.
 
 ### Agent System
 
@@ -128,7 +135,12 @@ Seven skills are independent — not tied to any single agent:
 - SKILL.md ≤ 200 lines; use supporting docs for detail
 - Include: quick reference table, core principles, code examples, anti-patterns, output format
 - Supporting docs go in the same directory (not in subdirectories)
-- **Profile-awareness:** When a skill covers a decision that differs by profile (e.g., where business logic goes, which testing framework to use), present the profile-appropriate pattern. Use the format: "**Omakase:** do X / **Service-oriented:** do Y" rather than presenting one approach as universal. Reference `rails-stack-profiles` for detection logic.
+- **No inline profile conditionals.** Never write "**Omakase:** do X / **Service-oriented:** do Y" inside a skill's prose. A conditional in the markdown is a branch the model re-evaluates on every read. Instead:
+  - **Invariant content** (true regardless of architecture) stays in `SKILL.md` or a shared supporting doc, stated once.
+  - **Axis-divergent content** moves to flat per-axis fork files named `<topic>.<axis-value>.md` (e.g. `extraction.native.md`, `extraction.extracted.md`). Each fork file is declarative — it describes its own world with no `if`. The `SKILL.md` resolves the axis (via `rails-stack-profiles`, cached for the session) and points to the matching fork file.
+  - **Orthogonal project facts** (test framework, job/cache backend, auth library) are consumed from the `project-conventions` fingerprint. Never branch on an architecture "profile" to guess them.
+  - If a divergence is a single line, consume the axis value inline in that one sentence — do not create a fork file for one line.
+  - Resolver pointer at the top of an axis-forking `SKILL.md`: "If axes are resolved this session, use them; else run `rails-stack-profiles`. Then read `<topic>.<resolved-axis>.md`." If axes cannot be resolved, default to `native + html` and state the assumption.
 
 ## Key Conventions
 

@@ -18,7 +18,7 @@ In Rails, Method Object often becomes a service object or calculator class (e.g.
 | Shared across models? | No -- unique to one model | Yes -- 2+ models need it |
 | Has its own state/data? | Yes -- deserves its own table | No -- operates on host's attributes |
 | Testable in isolation? | Should be | May depend on host class |
-| Profile preference | Service-oriented, API-first | Omakase |
+| Axis A preference | `extracted` | `native` |
 
 **Anti-pattern**: extracting a concern used by only one model. This is just moving code without reducing complexity.
 

@@ -4,13 +4,13 @@ Use standard RSpec/Minitest syntax and conventions for basic test structure. Thi
 
 ## Fixture vs Factory: The Real Trade-offs
 
-### When Fixtures Win (Not Just "Omakase Default")
+### When Fixtures Win
 
 - **Speed at scale**: 500+ factories in a suite add minutes; fixtures load once via bulk insert
 - **Referential integrity**: Fixtures enforce FK relationships at load time — broken references fail fast
 - **Readability for stable domains**: When your User/Account/Role models rarely change, named fixtures are clearer than factory chains
 
-### When Factories Win (Not Just "RSpec Default")
+### When Factories Win
 
 - **Rapidly changing schemas**: Factories adapt with one default change; fixtures need N files updated
 - **Combinatorial test data**: Traits compose (`create(:user, :admin, :with_posts, :deactivated)`) — fixtures require a new named entry per combination

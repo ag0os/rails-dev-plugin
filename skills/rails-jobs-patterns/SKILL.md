@@ -27,7 +27,7 @@ Follow standard Rails conventions for `retry_on`, `discard_on`, `queue_as`, and 
 
 ## Core Principles
 
-1. **Jobs are shallow wrappers**: Business logic lives in models (omakase) or service objects (service-oriented). Jobs handle only queuing and retry infrastructure
+1. **Jobs are shallow wrappers**: Business logic lives in its Axis A home (`rails-stack-profiles`) — models and concerns for `native`, service objects for `extracted`. Jobs handle only queuing and retry infrastructure
 2. **`_later`/`_now` convention**: Define `thing_later` (queues job) and `thing` (does work) on the model. The job just calls the model method
 3. **Double-check locking for idempotency**: Guard clause THEN `with_lock` THEN guard again — prevents races between concurrent workers
 4. **Pass IDs, not objects**: Avoid serialization issues and stale data
@@ -150,7 +150,7 @@ For apps using `CurrentAttributes` with multi-tenancy — automatically serializ
 
 | Anti-Pattern | Fix |
 |-------------|-----|
-| Business logic inside job | **Omakase:** delegate to model. **Service-oriented:** delegate to service |
+| Business logic inside job | Delegate to its Axis A home (see Principle 1) |
 | Guard clause without `with_lock` | Use double-check locking pattern above |
 | `find_in_batches` all in one job | Self-splitting batch or `perform_all_later` |
 | No queue segmentation | Use priority queues (critical/default/low/mailers) |

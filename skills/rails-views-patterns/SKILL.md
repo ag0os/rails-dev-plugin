@@ -8,6 +8,8 @@ allowed-tools: Read, Grep, Glob
 
 Follow standard Rails view conventions for ERB templates, partials, layouts, helpers, `form_with`, and `content_for` regions. This skill covers only the opinionated and non-obvious additions.
 
+**Applies on the `html` delivery axis** (Axis B, `rails-stack-profiles`). On the `api` axis there are no app views — use `rails-api-patterns` instead.
+
 See [patterns.md](patterns.md) for detailed examples.
 
 ## Quick Reference
@@ -27,12 +29,15 @@ See [patterns.md](patterns.md) for detailed examples.
 3. **Always `render collection:`** -- never `each` + `render` inside the loop (performance + enables collection caching)
 4. **Cache aggressively** -- fragment caching with `cached: true` on collections, Russian-doll nesting for parent/child
 
-## Presenter Objects (Profile-Aware)
+## Presenter Objects and ViewComponents
 
-**Omakase:** Extract complex view logic into plain Ruby presenter objects -- not ViewComponents.
+Where complex view logic goes is governed by an **orthogonal project fact**, not an architecture axis: whether the `view_component` gem is installed. Read it from the `project-conventions` fingerprint (Frontend category).
+
+- **`view_component` gem present:** use ViewComponents — see [patterns.md](patterns.md).
+- **No `view_component` gem:** extract complex view logic into plain Ruby presenter objects.
 
 ```ruby
-# app/presenters/dashboard_presenter.rb (or app/models/ for omakase)
+# app/presenters/dashboard_presenter.rb
 class DashboardPresenter
   attr_reader :user, :period
 
@@ -57,8 +62,6 @@ end
   <%= render partial: "activity", collection: activities, cached: true %>
 <% end %>
 ```
-
-**Service-oriented:** ViewComponents are preferred when the `view_component` gem is present. See [patterns.md](patterns.md) for the ViewComponent pattern.
 
 ## Anti-Patterns
 

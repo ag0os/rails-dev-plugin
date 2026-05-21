@@ -122,34 +122,6 @@ class NotificationMailer < ApplicationMailer
 end
 ```
 
-## Profile-Aware Delivery Triggers
-
-**Omakase — model callback triggers delivery (uses `_later`/`_now` convention):**
-
-```ruby
-class Order < ApplicationRecord
-  after_create_commit :send_confirmation
-
-  private
-
-  def send_confirmation
-    OrderMailer.confirmation(self).deliver_later
-  end
-end
-```
-
-**Service-oriented — service triggers delivery:**
-
-```ruby
-class Orders::Create
-  def call
-    order = Order.create!(params)
-    OrderMailer.confirmation(order).deliver_later
-    Result.new(success: true, order: order)
-  end
-end
-```
-
 ## Queue Configuration
 
 ```ruby
@@ -162,33 +134,6 @@ class UrgentMailer < ApplicationMailer
 end
 ```
 
-## Profile-Aware Testing
+## Testing
 
-**Omakase — Minitest:**
-
-```ruby
-class OrderMailerTest < ActionMailer::TestCase
-  test "confirmation email" do
-    order = orders(:confirmed)
-    email = OrderMailer.confirmation(order)
-
-    assert_emails 1 do
-      email.deliver_now
-    end
-    assert_equal [order.user.email], email.to
-    assert_match "Order ##{order.number}", email.subject
-  end
-end
-```
-
-**Service-oriented — RSpec with `have_enqueued_mail`:**
-
-```ruby
-RSpec.describe "Order creation", type: :request do
-  it "sends confirmation email" do
-    expect {
-      post orders_path, params: { order: attributes_for(:order) }
-    }.to have_enqueued_mail(OrderMailer, :confirmation)
-  end
-end
-```
+Mailer testing is framework-specific; see `rails-testing-patterns` and the `project-conventions` fingerprint for the project's framework. The mailer skill's responsibility ends at *what* to assert (enqueue, recipients, subject, body) — see "Testing Mailers" in SKILL.md.

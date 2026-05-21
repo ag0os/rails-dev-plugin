@@ -14,24 +14,23 @@ See [patterns.md](patterns.md) for decision guidance and non-obvious patterns.
 
 | Test Type | When to Write | Speed | ROI Notes |
 |-----------|--------------|-------|-----------|
-| Unit (Model) | Business logic, validations, scopes, custom methods | Fast | Highest ROI — write these first in service-oriented stacks |
-| Request | API endpoints, auth flows, param handling | Medium | Highest ROI for api-first stacks; prefer over controller specs in RSpec |
-| Integration | Multi-step workflows spanning controllers | Medium | Omakase priority — tests the full stack as Rails intends |
+| Unit (Model) | Business logic, validations, scopes, custom methods | Fast | Highest ROI — write first wherever models or services carry non-trivial logic |
+| Request | API endpoints, auth flows, param handling | Medium | Highest ROI on the `api` delivery axis; prefer over controller specs in RSpec |
+| Integration | Multi-step workflows spanning controllers | Medium | Valuable on the `html` delivery axis — exercises the full request/render cycle |
 | System | Critical user journeys only (sign-up, checkout, onboarding) | Slow | Limit to 10-20 per app; never test CRUD forms with system tests |
 | Mailer | Non-trivial email content, conditional delivery | Fast | Skip if mailer is just a default scaffold |
 | Job | Idempotency, retry behavior, side effects | Fast | Always test jobs that touch external services |
 
-## Profile-Aware Testing
+## Framework, Data, and Directory
 
-**Detect the project's profile before recommending a testing approach.**
+Test framework, data strategy, and directory are **orthogonal project facts**, not architecture choices. A project with extracted service objects can use Minitest; an omakase app can use RSpec. Read them from the `project-conventions` fingerprint (Testing category) — framework (Minitest/RSpec), data (fixtures/factories), directory (`test/` vs `spec/`). Never infer the framework from architecture.
 
-| Decision | Omakase | Service-Oriented | API-First |
-|----------|---------|-----------------|-----------|
-| Framework | Minitest | RSpec | RSpec |
-| Test data | Fixtures | FactoryBot | FactoryBot |
-| Directory | `test/` | `spec/` | `spec/` |
-| First tests to write | Integration/controller tests | Unit tests + request specs | Request specs |
-| System tests | Yes, for key flows | Sparingly | No — use request specs |
+Test *emphasis* does vary by **Axis B — delivery**:
+
+| Delivery | First tests to write | System tests |
+|----------|---------------------|--------------|
+| `html` | Integration tests for key flows | Yes, for critical user journeys |
+| `api` | Request specs | No — request specs cover it |
 
 ## Anti-Patterns
 
@@ -47,13 +46,15 @@ See [patterns.md](patterns.md) for decision guidance and non-obvious patterns.
 
 ## Test Data Strategy
 
-**Omakase — fixtures first:**
+Use whichever strategy the project already uses — the `project-conventions` fingerprint reports fixtures vs factories. Guidance for each:
+
+**When the project uses fixtures:**
 - Fixtures are loaded once per test run (fast) and double as development seed data
 - Use **realistic, named** fixtures: `jane:`, `admin:` — never `user_1:`, `user_2:`
 - Use inline `Model.new(...)` only for one-off edge cases not worth a fixture
 - Fixture files are the canonical source of test data — keep them curated
 
-**Service-oriented / API-first — factories first:**
+**When the project uses factories:**
 - Minimal factory defaults — only required fields, everything else via traits
 - Use `build` (not `create`) whenever persistence isn't needed — dramatically faster
 - Use `sequence` for uniqueness constraints (emails, slugs)

@@ -8,6 +8,20 @@ allowed-tools: Read, Grep, Glob
 
 Analyze and recommend patterns for extracting and organizing business logic in Rails applications.
 
+## Resolve the axis first
+
+This skill forks on **Axis A — logic placement**. Before recommending where logic goes:
+
+1. If the axes are already resolved this session, use them.
+2. Otherwise resolve via `rails-stack-profiles` (Axis A only — `native` or `extracted`).
+3. Then read the matching extraction guide:
+   - `native` → [extraction.native.md](extraction.native.md)
+   - `extracted` → [extraction.extracted.md](extraction.extracted.md)
+
+If the axis cannot be resolved, default to `native` and state the assumption.
+
+Everything else in this file is **invariant** — it holds regardless of axis.
+
 ## Quick Reference
 
 | Pattern | Use When | Entry Point |
@@ -20,29 +34,16 @@ Analyze and recommend patterns for extracting and organizing business logic in R
 
 ## Supporting Documentation
 
-- [patterns.md](patterns.md) - Result objects, form objects, and profile-aware guidance
+- [extraction.native.md](extraction.native.md) — when to extract, `native` axis
+- [extraction.extracted.md](extraction.extracted.md) — when to extract, `extracted` axis
+- [patterns.md](patterns.md) — result objects, form objects, query objects, error handling
 
 ## Core Principles
 
 1. **VerbNoun naming**: `CreateOrder`, `SendInvitation` -- never `OrderService` or `UserManager`
 2. **One public method**: Expose only `call` (or `perform`)
 3. **Explicit return values**: Use Result objects, never exceptions for expected flow control
-4. **Profile-aware extraction**: See "When to Extract" below
-
-## When to Extract a Service (Profile-Dependent)
-
-| Scenario | Omakase | Service-Oriented / API-First |
-|----------|---------|------------------------------|
-| Logic on a single model's own data | Model method or concern | Model method |
-| Shared behavior across models | Concern | Concern |
-| Domain logic for one model | Concern | Service object |
-| Multi-model workflow with rollback | Model method + transaction | Service object |
-| External API call | Model method wrapping client | Service object |
-| Simple side effect (email, log) | Callback (`after_commit`) | Service object |
-
-**Omakase:** Only extract to a service when the workflow genuinely spans multiple unrelated models or external systems. Prefer concerns and enriched model methods.
-
-**Service-oriented / API-first:** Service objects are the default extraction target for any non-trivial business logic.
+4. **Axis-aware extraction**: Whether a given operation becomes a service at all depends on Axis A. Read the matching extraction guide above before recommending a service.
 
 ## Result Object Pattern
 
@@ -85,7 +86,7 @@ See [patterns.md](patterns.md) for the enhanced monad-like `ServiceResult` with 
 ## Output Format
 
 When analyzing or creating services, provide:
-1. **Service file** in `app/services/` with VerbNoun naming
+1. **Service file** with VerbNoun naming, placed per the axis extraction guide
 2. **Result struct** if callers need success/failure status
 3. **Controller integration** showing how to call and handle results
 4. **Test outline** covering happy path, failure cases, and edge cases

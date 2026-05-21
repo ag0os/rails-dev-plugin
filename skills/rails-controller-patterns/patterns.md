@@ -58,11 +58,13 @@ end
 
 Layered concerns combine before_actions with shared helper methods, reducing duplication across multiple resource controllers that operate on the same parent.
 
-## Authorization Patterns (Profile-Dependent)
+## Authorization Patterns
 
-### Model-Based Authorization (Omakase Profile)
+Authorization is governed by an **orthogonal project fact**, not an architecture axis: which authorization library the project uses. Read it from the `project-conventions` fingerprint (Auth category — `pundit` / `cancancan` / `action_policy` / none). Match the project; never branch on a stack profile here.
 
-Use when no auth gem is installed and the project follows omakase conventions. Authorization logic lives in the domain model.
+### Model-Based Authorization (no authorization gem)
+
+Use when no authorization gem is installed. Authorization logic lives in the domain model.
 
 ```ruby
 # In controller
@@ -84,9 +86,9 @@ class User < ApplicationRecord
 end
 ```
 
-### Pundit Policy Objects (Service-Oriented Profile)
+### Pundit Policy Objects (authorization gem present)
 
-Use when `pundit` gem is present. Follow existing conventions.
+Use when `pundit` (or a similar gem) is present. Follow existing conventions.
 
 ```ruby
 class PostPolicy < ApplicationPolicy
@@ -105,7 +107,7 @@ class PostsController < ApplicationController
 end
 ```
 
-**Profile detection:** Check `Gemfile` for `pundit` or `cancancan`. If present, use that. If absent and omakase profile, use model-based auth.
+**Detection:** the `project-conventions` fingerprint's Auth category reports the authorization library. If a gem is present, use it. If none, use model-based auth.
 
 ## Streaming Responses
 
@@ -170,7 +172,7 @@ grep "rails (" Gemfile.lock
 **2. Check Authorization Gems**:
 ```bash
 grep -E "gem ['\"]pundit|cancancan" Gemfile
-# If found: use existing gem. If absent + omakase: model-based auth.
+# If found: use existing gem. If absent: model-based auth.
 ```
 
 **3. Check for Custom Actions to Refactor**:
@@ -184,14 +186,14 @@ end
 ## Best Practices
 
 ### Do
-- **Omakase:** delegate business logic to models and concerns
-- **Service-oriented:** delegate business logic to service objects
-- Check project stack profile before suggesting patterns
+- Delegate business logic to its Axis A home (`native`: models and concerns; `extracted`: service objects)
+- Resolve Axis A via `rails-stack-profiles` before recommending where logic goes
+- Match the project's authorization library from the `project-conventions` fingerprint
 - Prefer dedicated resource controllers over custom actions
 - Use layered concerns for shared setup logic
 
 ### Don't
-- Suggest model-based auth when Pundit/CanCanCan is installed
-- Suggest Pundit/Devise to omakase projects that use built-in auth
+- Suggest model-based auth when an authorization gem is installed
+- Suggest a new auth gem when the project already has a working auth approach
 - Use `params.expect` in Rails < 8
 - Nest resources more than one level deep

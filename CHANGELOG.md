@@ -12,6 +12,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Integration with popular Rails gems
 - Example test project with sample code
 
+## [3.0.0] - 2026-05-21
+
+### Changed (Breaking)
+
+#### Stack profiles replaced by two architecture axes
+The three-value stack profile enum (`omakase`, `service-oriented`, `api-first`) is removed. It conflated five independent concerns into one classification. It is replaced by two independent binary axes plus direct fact detection:
+
+- **Axis A — logic placement** (`native` / `extracted`): where non-trivial business logic lives.
+- **Axis B — delivery** (`html` / `api`): server-rendered views vs headless JSON.
+- **Orthogonal facts** (test framework, job/cache backend, auth library) are now detected by `project-conventions` and consumed from its fingerprint — never inferred from architecture.
+
+All four axis combinations are valid, including `native + api`, which the old enum could not express.
+
+#### No inline profile conditionals
+Skills no longer carry inline `Omakase: X / Service-oriented: Y` conditionals. Axis-divergent guidance moved into flat per-axis fork files (`<topic>.<axis>.md`); the `SKILL.md` resolves the axis once and loads the matching file. The `CLAUDE.md` skill-development guideline now bans inline profile conditionals.
+
+- `rails-stack-profiles`: emits two axes; `profiles.md` split into `axis-a.md` + `axis-b.md`.
+- `rails-service-patterns`: `extraction.native.md` / `extraction.extracted.md`.
+- `rails-model-patterns`: `decomposition.native.md` / `decomposition.extracted.md`.
+- `rails-mailer-patterns`: `delivery-trigger.native.md` / `delivery-trigger.extracted.md`.
+- `rails-architecture-patterns`: `decisions.native.md` / `decisions.extracted.md`.
+- `rails-controller-patterns`, `rails-jobs-patterns`, `ruby-refactoring`, `ruby-object-design`: single-line axis divergences consumed inline.
+- `rails-testing-patterns`, `rails-caching-patterns`, `rails-auth-patterns`: profile framing removed; test framework, cache store, and auth approach now consumed from the `project-conventions` fingerprint.
+- `rails-views-patterns`, `hotwire-patterns`, `rails-api-patterns`: marked as gated on the Axis B delivery value.
+- `rails-architect` agent: Step 0 resolves the two axes instead of classifying a profile.
+
 ## [1.3.0] - 2026-01-06
 
 ### Added

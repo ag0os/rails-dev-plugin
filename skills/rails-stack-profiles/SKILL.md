@@ -1,97 +1,93 @@
 ---
 name: rails-stack-profiles
-description: Detects and applies Rails stack profiles (omakase, service-oriented, api-first) based on project conventions. Use when planning architecture, making design decisions, or when the recommended approach depends on the project's stack choices (Solid Queue vs Sidekiq, concerns vs service objects, Minitest vs RSpec, fixtures vs factories). NOT for implementation details — delegates to domain-specific skills.
+description: Detects a Rails project's architecture axes — logic placement (native vs extracted) and delivery (html vs api) — so other skills load profile-appropriate guidance without inline conditionals. Use when planning architecture or when a recommendation depends on where business logic lives or whether the app renders HTML or serves JSON. NOT for test framework, job backend, cache store, or auth library choices — those are orthogonal facts detected by project-conventions.
 allowed-tools: Read, Grep, Glob
 ---
 
-# Rails Stack Profiles
+# Rails Stack Axes
 
-Detect the project's architectural profile before recommending patterns. Different Rails codebases follow different conventions — recommendations must match the project, not a single opinionated default.
+Resolve a project's architecture **once per session**, as two independent binary axes. Other skills consume the resolved axes to load one flat, branch-free guidance file each — they never carry inline `omakase / service-oriented` conditionals.
 
-See [profiles.md](profiles.md) for detailed profile definitions, detection signals, and per-profile recommendations.
+See [axis-a.md](axis-a.md) and [axis-b.md](axis-b.md) for characteristic patterns and code per axis value.
 
-## Three Profiles
+## The Two Axes
 
-| Profile | Philosophy | Key Markers |
-|---------|-----------|-------------|
-| **omakase** | Rails defaults, convention over gems | Solid Queue, Minitest, fixtures, concerns, `has_secure_password` |
-| **service-oriented** | Explicit layers, extracted business logic | Sidekiq, RSpec, FactoryBot, `app/services/`, Devise, Pundit |
-| **api-first** | Headless JSON backend | `ActionController::API`, serializers, JWT, no `app/views/` |
+A project is **not** one of three profiles. It is one value on each of two axes:
 
-## Detection Checklist
+| Axis | Values | Question it answers |
+|------|--------|---------------------|
+| **A — logic placement** | `native` \| `extracted` | Where does non-trivial business logic live? |
+| **B — delivery** | `html` \| `api` | Does the surface render HTML or serve JSON? |
 
-Run these checks against the project to determine its profile:
+- **`native`** — logic lives in models, concerns, and POROs. The Rails-omakase way. Callbacks are acceptable for simple side effects.
+- **`extracted`** — service/command objects are the default home for non-trivial logic. Common in larger teams and complex domains.
+- **`html`** — server-rendered views, Hotwire (Turbo + Stimulus).
+- **`api`** — headless JSON, serializers, no `app/views/` (mailer views aside).
 
-```
-1. Read Gemfile for key gems
-2. Check directory structure (app/services/, spec/ vs test/, app/views/)
-3. Check config/database.yml adapter
-4. Check test setup (RSpec vs Minitest, factories vs fixtures)
-5. Check job backend (config/queue.yml vs config/sidekiq.yml)
-6. Check auth approach (Devise, has_secure_password, JWT)
-```
+The axes are independent. All four combinations are valid, including `native + api` (a Rails 8 omakase-style API-only app — a combination the old three-profile enum could not express).
 
-## Quick Detection Matrix
+The legacy names map cleanly: `omakase` = `native + html`, `service-oriented` = `extracted + html`, `api-first` = `extracted + api`.
 
-| Signal | Omakase | Service-Oriented | API-First |
-|--------|---------|-----------------|-----------|
-| `gem "sidekiq"` | | X | X |
-| `gem "solid_queue"` | X | | |
-| `gem "rspec-rails"` | | X | X |
-| `test/` directory | X | | |
-| `gem "factory_bot"` | | X | X |
-| `test/fixtures/` | X | | |
-| `app/services/` exists | | X | |
-| `gem "devise"` | | X | |
-| `has_secure_password` | X | | |
-| `gem "pundit"` | | X | |
-| `gem "jbuilder"` | X | | |
-| `gem "alba"` or `gem "blueprinter"` | | X | X |
-| `ActionController::API` base | | | X |
-| `app/views/` has ERB files | X | X | |
-| `gem "jwt"` | | | X |
-| `config/solid_cache.yml` | X | | |
+## What is NOT an axis
 
-## Profile Mixing
+Test framework, test data strategy, job backend, cache store, and auth library are **orthogonal project facts**, not architecture axes. A project with extracted services can still use Minitest; an omakase app can run Sidekiq. Inferring these from architecture is the central mistake this restructure removes.
 
-Most real projects are **hybrids**. A project can be:
-- Omakase core with a service-oriented billing module
-- Service-oriented with an api-first namespace (`/api/v1/`)
-- Omakase that adopted RSpec early but kept everything else default
+Detect them directly via the **`project-conventions`** fingerprint. Skills consume those fingerprint fields; they never branch on a "profile" for them.
 
-**When signals conflict:** weight the project's dominant pattern. A project with `app/services/` containing 50 classes is service-oriented even if it uses Minitest.
+## Detecting Axis A — logic placement
 
-## How Profiles Affect Recommendations
+| Signal | Points to |
+|--------|-----------|
+| `app/services/` with ~5+ files | `extracted` |
+| Custom `ApplicationService` / `BaseService` base class | `extracted` |
+| `gem "dry-monads"`, `gem "interactor"`, `gem "trailblazer"` | `extracted` |
+| `app/services/` absent or near-empty | `native` |
+| Domain logic in models + `app/models/concerns/` | `native` |
+| Callbacks orchestrating multi-step workflows | `native` |
+| POROs for operations, often in `app/models/` | `native` |
 
-| Decision Point | Omakase | Service-Oriented | API-First |
-|---------------|---------|-----------------|-----------|
-| Where does business logic go? | Model methods + concerns | Service objects | Service objects or interactors |
-| Fat controller fix | Extract to model/concern | Extract to service object | Extract to service object |
-| God model fix | Extract concerns | Extract service objects + value objects | Extract query/command objects |
-| Callbacks for side effects? | Acceptable if simple | Avoid — use services | Avoid — use services |
-| Testing framework | Minitest | RSpec | RSpec |
-| Test data | Fixtures | FactoryBot | FactoryBot |
-| Job backend | Solid Queue | Sidekiq | Sidekiq or Solid Queue |
-| Auth | `has_secure_password` | Devise | JWT or token-based |
-| Authorization | Controller-level checks | Pundit policies | Token scopes or Pundit |
-| Frontend | Hotwire (Turbo + Stimulus) | Hotwire (Turbo + Stimulus) | None — JSON responses |
-| Serialization | Jbuilder or `to_json` | Alba, Blueprinter | Alba, Blueprinter, jsonapi-serializer |
-| Real-time | Solid Cable + Turbo Streams | ActionCable + Turbo Streams | WebSockets or SSE |
-| Cache backend | Solid Cache | Redis | Redis |
-| DB default | SQLite (dev), PostgreSQL (prod) | PostgreSQL | PostgreSQL |
+Weight the dominant pattern. A project with 50 service classes is `extracted` even if a few models are still fat.
 
-## Output Format
+## Detecting Axis B — delivery
 
-When reporting a detected profile:
+| Signal | Points to |
+|--------|-----------|
+| App base controller is `ActionController::API` | `api` |
+| No `app/views/` (or mailer views only) | `api` |
+| `gem "jwt"`, `rack-cors`, serializer gems and no ERB | `api` |
+| `app/views/**/*.erb` present | `html` |
+| Hotwire (`turbo-rails`, `stimulus-rails`), `turbo_stream` responses | `html` |
+
+## Detection procedure
 
 ```
-## Stack Profile: [omakase | service-oriented | api-first | hybrid]
-
-**Detected from:**
-- [signal]: [evidence]
-- [signal]: [evidence]
-
-**Hybrid notes:** [if applicable — which parts diverge and why]
-
-**Recommendations will follow [profile] conventions.**
+1. Glob app/services/**/*.rb        → count → Axis A
+2. Grep Gemfile for dry-monads / interactor / trailblazer → Axis A
+3. Grep app/ for class Application\w+ < / class Base\w+ <  → Axis A
+4. Read the app base controller class → ActionController::API? → Axis B
+5. Glob app/views/**/*.erb           → presence → Axis B
+6. Grep Gemfile for turbo-rails / jwt → Axis B
 ```
+
+## Hybrids — resolve per surface, not per repo
+
+Most real projects are mixed: an omakase app with an `extracted` billing module, or an `html` app with an `/api/v1` namespace. Do not force one repo-wide answer.
+
+**Resolve the axes for the module or namespace in focus**, not the whole codebase. The directory being worked on (`app/billing/`, `app/controllers/api/`) has one clear answer on each axis. Ask the sharp question — "what is *this* surface?" — not the blurry one.
+
+## Output contract
+
+When reporting resolved axes:
+
+```
+## Stack Axes
+- **logic:** [native | extracted]  — resolved from: [signal]
+- **delivery:** [html | api]       — resolved from: [signal]
+- **scope:** [whole app | namespace/module in focus]
+```
+
+Cache this for the session. Other skills read it; they do not re-detect.
+
+## Degradation
+
+If the axes cannot be resolved (empty or greenfield project), default to `native + html` (the Rails default posture) and state the assumption in one line.

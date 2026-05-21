@@ -34,9 +34,9 @@ Key points:
 <% end %>
 ```
 
-## ViewComponent Patterns (Service-Oriented)
+## ViewComponent Patterns
 
-**Profile:** ViewComponents are a service-oriented pattern. **Omakase** projects prefer helpers, partials, and presenter POROs. Use ViewComponents only when the `view_component` gem is already in the project.
+Use ViewComponents only when the `view_component` gem is already in the project (`project-conventions` fingerprint, Frontend category). Without the gem, prefer helpers, partials, and presenter POROs — do not introduce ViewComponent to a project that does not use it.
 
 ```ruby
 # app/components/alert_component.rb

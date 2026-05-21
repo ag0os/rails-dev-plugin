@@ -8,19 +8,16 @@ allowed-tools: Read, Grep, Glob
 
 Architectural planning frameworks and decision guidance. Coordinate across domain skills and agents.
 
-See [patterns.md](patterns.md) for detailed decision frameworks and profile-aware anti-pattern fixes.
+See [patterns.md](patterns.md) for detailed decision frameworks. Logic-placement and structural-smell fixes fork on Axis A — see [decisions.native.md](decisions.native.md) / [decisions.extracted.md](decisions.extracted.md).
 
-## Stack Profile Awareness
+## Resolve the Stack Axes First
 
-**Before recommending patterns, determine the project's stack profile.** See `rails-stack-profiles` for detection logic.
+**Before recommending patterns, resolve the project's architecture axes** via `rails-stack-profiles` (once per session):
 
-| Decision | Omakase | Service-Oriented | API-First |
-|----------|---------|-----------------|-----------|
-| Business logic home | Models + concerns | Service objects | Service/command objects |
-| Fat controller fix | Extract to concern/model | Extract to service | Extract to service |
-| Testing | Minitest + fixtures | RSpec + FactoryBot | RSpec + FactoryBot |
-| Auth | `has_secure_password` | Devise | JWT/token |
-| Job backend | Solid Queue | Sidekiq | Sidekiq or Solid Queue |
+- **Axis A — logic placement** (`native` / `extracted`): drives where business logic lives and how structural smells are fixed. See [decisions.native.md](decisions.native.md) / [decisions.extracted.md](decisions.extracted.md).
+- **Axis B — delivery** (`html` / `api`): drives view vs serializer choices and which domain skills apply.
+
+Orthogonal facts — test framework, job backend, cache store, auth library — come from the `project-conventions` fingerprint, not from an architecture axis. Never infer them here.
 
 ## Available Domain Skills and Agents
 
@@ -47,12 +44,12 @@ See [patterns.md](patterns.md) for detailed decision frameworks and profile-awar
 | Question | Option A | Option B | Choose A when | Choose B when |
 |----------|----------|----------|---------------|---------------|
 | Inheritance | STI | Polymorphic | >70% shared columns, same behavior | Different attributes per type |
-| Shared logic | Concern | Service Object | Omakase, or adds model capability | Service-oriented, or orchestrates workflow |
+| Shared logic | Concern | Service Object | Axis A `native`, or adds a model capability | Axis A `extracted`, or orchestrates a workflow |
 | Background work | ActiveJob | Inline | > 100ms or external call | Fast + must be synchronous |
-| Job backend | Solid Queue | Sidekiq | Omakase, simple needs | Redis already in stack |
+| Job backend | Solid Queue | Sidekiq | Simple needs, no Redis in stack | Redis already in stack |
 | API format | JSON:API | Custom JSON | Public API, many clients | Internal API, simple needs |
 | Frontend | Hotwire | SPA (React) | Content-heavy, progressive | Complex interactive UI |
-| Auth | `has_secure_password` | Devise | Omakase, simple needs | Multi-feature auth needed |
+| Auth | `has_secure_password` | Devise | Simple auth needs | Multi-feature auth needed |
 
 ## Implementation Order
 
@@ -69,7 +66,7 @@ For a typical feature:
 
 ## Architecture Health Checks
 
-**Universal (all profiles):**
+**Universal (all projects):**
 - [ ] No business logic in controllers or views
 - [ ] Controllers have 7 or fewer actions
 - [ ] No N+1 queries (check with Bullet gem)
@@ -77,18 +74,18 @@ For a typical feature:
 - [ ] Test coverage on critical paths
 - [ ] No circular dependencies between models
 
-**Omakase:**
+**Axis A — `native`:**
 - [ ] Models decomposed via concerns (not monolithic god models)
 - [ ] Callbacks are simple and predictable (data integrity, not workflows)
-- [ ] Using Rails defaults (Solid Queue, etc.) where possible
+- [ ] Using Rails defaults where possible
 
-**Service-oriented:**
-- [ ] Models under 200 lines (extract services if larger)
+**Axis A — `extracted`:**
+- [ ] Models stay lean — non-trivial logic extracted to services
 - [ ] All external API calls go through service objects
 - [ ] Service objects have single responsibility
 - [ ] Result pattern used consistently
 
-**API-first:**
+**Axis B — `api`:**
 - [ ] All responses use serializers (never raw ActiveRecord)
 - [ ] API versioned from day one
 - [ ] Authentication is token-based
@@ -99,7 +96,7 @@ For a typical feature:
 ```
 ## Architecture Plan: [feature_name]
 
-**Detected Profile:** [omakase | service-oriented | api-first]
+**Stack Axes:** logic=[native | extracted], delivery=[html | api]
 **Layers Involved:** Models, Controllers, Services, Tests
 
 **Implementation Steps:**

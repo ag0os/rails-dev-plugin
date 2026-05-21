@@ -8,12 +8,25 @@ allowed-tools: Read, Grep, Glob
 
 Analyze and recommend ActiveRecord model patterns for well-structured Rails applications.
 
+## Resolve the axis first
+
+Where a model's domain logic and side effects belong forks on **Axis A — logic placement**:
+
+1. If the axes are resolved this session, use them.
+2. Otherwise resolve via `rails-stack-profiles` (Axis A — `native` or `extracted`).
+3. Then read the matching decomposition guide:
+   - `native` → [decomposition.native.md](decomposition.native.md)
+   - `extracted` → [decomposition.extracted.md](decomposition.extracted.md)
+
+Default to `native` if the axis cannot be resolved. Everything else in this file is **invariant**.
+
 ## Supporting Documentation
 
 - [associations.md](associations.md) - Association decision guidance and advanced patterns
 - [validations.md](validations.md) - Validation strategy and custom validators
 - [migrations.md](migrations.md) - Safe migration practices for production
 - [value-objects.md](value-objects.md) - Value object and Struct/Data patterns
+- [decomposition.native.md](decomposition.native.md) / [decomposition.extracted.md](decomposition.extracted.md) - where domain logic and side effects go, per Axis A
 
 ## Core Principles
 
@@ -21,7 +34,7 @@ Analyze and recommend ActiveRecord model patterns for well-structured Rails appl
 2. **Database-backed integrity**: Always pair ActiveRecord validations with database constraints (unique index, NOT NULL, check constraints)
 3. **Associations always have `:dependent`**: Prevent orphaned records
 4. **Use `:inverse_of`**: Ensure bidirectional association consistency
-5. **Callbacks**: **Omakase** — use freely for simple, predictable side effects ("whenever X happens, do Y"). **Service-oriented** — minimize; prefer service objects for side effects
+5. **Callbacks**: Posture depends on Axis A — read the decomposition guide above. Universally: a callback is for one predictable effect, never multi-step orchestration.
 
 ## Model Structure Template
 
@@ -59,51 +72,6 @@ end
 # Controller: @post = Post.create!(post_params) — no need to assign creator
 ```
 
-### Concern-Based Domain Composition (Omakase)
-
-**Omakase profile:** Concerns are the primary tool for decomposing models — for domain logic, not just shared behavior. Slice by trait/role: `Triageable`, `Postponable`, `Closeable`.
-
-```ruby
-# app/models/concerns/closeable.rb
-module Closeable
-  extend ActiveSupport::Concern
-  included do
-    has_one :closure, dependent: :destroy
-    scope :closed, -> { joins(:closure) }
-    scope :open, -> { where.missing(:closure) }
-  end
-
-  def closed? = closure.present?
-  def close!(by:, reason: nil) = create_closure!(creator: by, reason: reason)
-  def reopen! = closure&.destroy!
-end
-
-# app/models/card.rb — composed from concerns
-class Card < ApplicationRecord
-  include Closeable
-  include Triageable
-  include Postponable
-end
-```
-
-### POROs for Domain Operations (Omakase)
-
-**Omakase profile:** Plain Ruby objects for operations that don't fit a model. Not "service objects" — just objects, often in `app/models/`.
-
-```ruby
-# app/models/signup.rb
-class Signup
-  include ActiveModel::Model
-  attr_accessor :name, :email, :password
-  validates :name, :email, :password, presence: true
-
-  def save
-    return false unless valid?
-    User.create!(name: name, email: email, password: password)
-  end
-end
-```
-
 ### Counter Cache with Default Lambda
 
 ```ruby
@@ -115,8 +83,8 @@ belongs_to :user, counter_cache: true
 
 | Anti-Pattern | Problem | Fix |
 |-------------|---------|-----|
-| Fat models (500+ lines) | Hard to maintain | **Omakase:** extract concerns. **Service-oriented:** extract service objects |
-| Callbacks with complex orchestration | Hard to reason about | **Omakase:** keep callbacks simple; use model methods for multi-step workflows. **Service-oriented:** use service objects |
+| Fat models (500+ lines) | Hard to maintain | Decompose — see the decomposition guide for your axis |
+| Callbacks with complex orchestration | Hard to reason about | Simplify the callback — see the decomposition guide for your axis |
 | Missing `:dependent` on associations | Orphaned records | Always specify `:dependent` |
 | `default_scope` | Confusing query behavior | Use named scopes instead |
 | Validations without DB constraints | Data integrity gaps | Add both layers |
@@ -127,7 +95,7 @@ belongs_to :user, counter_cache: true
 When analyzing or creating models, provide:
 1. **Model file** with proper structure and organization
 2. **Migration file** with indexes, constraints, and safe rollback
-3. **Test outline**: **Omakase** — Minitest with fixtures. **Service-oriented** — RSpec with factories
+3. **Test outline** in the project's test framework — read it from the `project-conventions` fingerprint (Minitest/RSpec, fixtures/factories); do not infer it from architecture
 4. **Performance notes** on indexes and query patterns
 
 ## Error Handling

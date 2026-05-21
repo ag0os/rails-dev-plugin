@@ -8,6 +8,8 @@ allowed-tools: Read, Grep, Glob
 
 Analyze and recommend Stimulus + Turbo patterns for modern, interactive Rails applications.
 
+**Applies on the `html` delivery axis** (Axis B, `rails-stack-profiles`). An `api`-delivery project has no server-rendered views and does not use Hotwire — use `rails-api-patterns` instead.
+
 ## Quick Reference
 
 | Component | Use When |

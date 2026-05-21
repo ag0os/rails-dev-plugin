@@ -12,6 +12,19 @@ Auto-detect project-specific patterns so agents generate code matching the proje
 Produces a **Convention Fingerprint** — a structured summary of observed patterns.
 Scan the codebase; do not ask the developer what patterns they use.
 
+## Fingerprint vs. Architecture Axes
+
+This skill is the **canonical source for orthogonal project facts** — facts that are independent of architecture and must never be inferred from a "profile":
+
+- test framework and data strategy (Minitest/RSpec, fixtures/factories)
+- job backend, cache store, real-time backend (Solid Queue/Sidekiq, Solid Cache/Redis)
+- auth library and authorization library (built-in/Devise, none/Pundit)
+- serialization library, pagination library, custom base classes
+
+A project with extracted service objects can still use Minitest; an omakase app can run Sidekiq. Skills consume these **fingerprint fields directly** — they do not branch on an architecture profile to guess them.
+
+Architecture itself — *where logic lives* and *html vs api delivery* — is the separate concern of `rails-stack-profiles` (Axis A and Axis B). The fingerprint detects facts; the axes classify architecture. The two are resolved independently and both cached for the session.
+
 ## Convention Categories
 
 | Category | Detects | Key Agents |

@@ -20,16 +20,18 @@ See [patterns.md](patterns.md) for detailed code examples.
 | `race_condition_ttl` | High-traffic keys — prevents cache stampede on expiry |
 | `fetch_multi` | Multiple cache reads — one round-trip instead of N |
 | Collection caching (`cached: true`) | Rendering collections — uses `read_multi` internally |
-| Solid Cache vs Redis | **Omakase:** Solid Cache. **Service-oriented:** Redis |
+| Solid Cache vs Redis | Match the configured store; default Solid Cache unless Redis is already in the stack |
 | Composite cache keys | Varying by user, locale, or version |
 
-## Profile-Aware Cache Store
+## Choosing a Cache Store
 
-| Profile | Store | Why |
-|---------|-------|-----|
-| **Omakase** | `config.cache_store = :solid_cache_store` | No external deps, database-backed, Rails 8 default |
-| **Service-oriented** | `config.cache_store = :redis_cache_store, { url: ENV["REDIS_URL"] }` | Already running Redis for Sidekiq/ActionCable |
-| **Development** | `:memory_store` | Toggle with `bin/rails dev:cache` |
+The cache store is an orthogonal project fact, not an architecture choice. If the project already configures one, match it (`project-conventions` fingerprint). For a new choice, pick by what is already in the stack:
+
+| Store | Use when | Why |
+|-------|----------|-----|
+| `config.cache_store = :solid_cache_store` | No Redis in the stack | No external deps, database-backed, Rails 8 default |
+| `config.cache_store = :redis_cache_store, { url: ENV["REDIS_URL"] }` | Redis already running (Sidekiq, ActionCable) | Reuse existing infrastructure |
+| `:memory_store` | Development | Toggle with `bin/rails dev:cache` |
 
 ## Core Principles
 

@@ -73,10 +73,10 @@ These smells manifest differently in Rails apps than in plain Ruby. See [code-sm
 - **Shotgun Surgery across Rails layers**: A single business rule change touching model, controller, view, serializer, and test -- consolidate into one domain object
 - **God models**: ActiveRecord models that accumulate callbacks, validations, scopes, and business logic for unrelated features -- extract concerns or service objects
 
-**Profile-aware refactoring targets:**
-- **Omakase**: Extract to concern or model method
-- **Service-oriented**: Extract to service object or PORO
-- **API-first**: Extract to serializer, policy, or form object
+**Extraction target depends on the stack axes** (`rails-stack-profiles`):
+- Axis A `native`: extract to a concern or model method
+- Axis A `extracted`: extract to a service object or PORO
+- Axis B `api`: view-layer logic extracts to a serializer or form object rather than a helper or presenter
 
 ## Output Format
 

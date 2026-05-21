@@ -7,7 +7,7 @@
 
 A Claude Code plugin that provides specialized agents and portable skills covering models, controllers, views, services, jobs, testing, architecture, DevOps, GraphQL, Hotwire, API design, and more.
 
-Agents auto-detect your project's stack profile (omakase, service-oriented, or api-first) and coding conventions, then generate code that matches your project — not generic Rails.
+Agents auto-detect your project's architecture — where business logic lives (`native` vs `extracted`) and how it delivers (`html` vs `api`) — plus its coding conventions, then generate code that matches your project — not generic Rails.
 
 ## Quick Start
 
@@ -33,7 +33,7 @@ Claude automatically selects the right agent based on your request.
 
 **Skills** are portable knowledge that agents draw from. They also work independently in the main conversation (e.g., asking about refactoring patterns or caching strategies).
 
-**Stack profiles** adapt recommendations to how your project is built. A project using Minitest + fixtures + concerns gets different advice than one using RSpec + FactoryBot + service objects.
+**Architecture axes** adapt recommendations to how your project is built. A project that keeps logic in models and concerns gets different advice than one built on service objects, and a server-rendered app gets different advice than a headless JSON API. Orthogonal facts — test framework, job backend, auth library — are detected separately and matched directly.
 
 **Convention detection** goes deeper than profiles — agents detect your specific base classes, naming patterns, result types, auth setup, and more before writing code. They also read your `CLAUDE.md` for intent that overrides detected patterns.
 

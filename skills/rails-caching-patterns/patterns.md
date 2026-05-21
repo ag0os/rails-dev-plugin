@@ -4,7 +4,7 @@ Follow standard Rails conventions for basic `cache` helper syntax, `Rails.cache.
 
 ## Cache Store Configuration
 
-### Solid Cache (Omakase — Rails 8 default)
+### Solid Cache (Rails 8 default, no external deps)
 
 Database-backed cache. No external dependencies.
 
@@ -33,7 +33,7 @@ production:
     migrations_paths: db/cache_migrate
 ```
 
-### Redis Cache Store (Service-Oriented)
+### Redis Cache Store (when Redis is already in the stack)
 
 ```ruby
 config.cache_store = :redis_cache_store, {

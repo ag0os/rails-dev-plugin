@@ -73,7 +73,7 @@ module Discounts
 end
 ```
 
-**Exception:** Service classes ARE appropriate when the Rails project follows service-oriented patterns consistently. Don't fight the codebase convention.
+**Exception:** Service classes ARE appropriate when the project is on the `extracted` Axis A value (`rails-stack-profiles`) and uses service objects consistently. Don't fight the codebase convention.
 
 ### 3. Classes Named After Design Patterns
 

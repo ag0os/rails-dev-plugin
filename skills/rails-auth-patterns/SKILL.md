@@ -6,26 +6,26 @@ allowed-tools: Read, Grep, Glob
 
 # Rails Authentication Patterns
 
-Profile-aware authentication guidance. **Never suggest replacing one approach with another** unless explicitly asked.
+The authentication approach is an **orthogonal project fact**, not an architecture axis — a `native` project can use Devise, an `extracted` project can use built-in auth. Match what the project already has; **never suggest replacing one approach with another** unless explicitly asked.
 
 See [patterns.md](patterns.md) for detailed code examples.
 
-## Profile Detection
+## Detecting the Auth Approach
 
-Check the project before recommending:
+Read it from the `project-conventions` fingerprint (Auth category), or detect directly:
 
 ```
-1. grep "devise" Gemfile → Devise (service-oriented)
-2. grep "has_secure_password" app/models/ → Built-in auth (omakase)
-3. Check for app/controllers/sessions_controller.rb → Custom auth
-4. Rails 8+? → Built-in generator available
+1. grep "devise" Gemfile → Devise
+2. grep "has_secure_password" app/models/ → built-in auth
+3. Check for app/controllers/sessions_controller.rb → custom auth
+4. Rails 8+? → built-in generator available
 ```
 
-| Approach | Profile | Use When |
-|----------|---------|----------|
-| Rails 8 generator | Omakase (Rails 8+) | New projects, full control, no gem dependencies |
-| `has_secure_password` (manual) | Omakase (pre-8) | Simple auth, full control |
-| Devise | Service-oriented | Multi-feature auth (confirmable, lockable, omniauthable) |
+| Approach | Use When |
+|----------|----------|
+| Rails 8 generator | New Rails 8+ projects, full control, no gem dependencies |
+| `has_secure_password` (manual) | Simple auth, full control, pre-Rails 8 |
+| Devise | Multi-feature auth (confirmable, lockable, omniauthable) |
 
 ## Rails 8 Built-In Auth
 
@@ -142,9 +142,11 @@ end
 
 See [patterns.md](patterns.md) for OmniAuth integration and custom controller patterns.
 
-## Profile-Aware Test Helpers
+## Test Helpers
 
-**Omakase (Minitest):**
+Write tests in the project's framework — read it from the `project-conventions` fingerprint (Testing category). The two examples below pair an auth approach with a framework, but the framework choice is independent of the auth approach.
+
+**Built-in auth, Minitest example:**
 
 ```ruby
 class SessionsControllerTest < ActionDispatch::IntegrationTest
@@ -163,7 +165,7 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
 end
 ```
 
-**Service-oriented (RSpec + Devise):**
+**Devise, RSpec example:**
 
 ```ruby
 # spec/rails_helper.rb
